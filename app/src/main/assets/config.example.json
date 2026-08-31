@@ -1,0 +1,16 @@
+{
+  "mail": {
+    "host": "imap.163.com",
+    "port": 993,
+    "smtp_host": "smtp.163.com",
+    "smtp_port": 465,
+    "user": "your_email@163.com",
+    "auth_code": "YOUR_163_AUTH_CODE_HERE",
+    "subject_prefix": "m3u8_view",
+    "folder": "INBOX"
+  },
+  "list_columns": ["title", "country", "type", "year", "director"],
+  "player": {
+    "auto_next": false
+  }
+}

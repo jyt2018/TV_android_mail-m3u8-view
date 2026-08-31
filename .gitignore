@@ -1,0 +1,43 @@
+# ===== Android / Gradle =====
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+gradle/wrapper/gradle-wrapper.jar
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# ===== Android Studio IDE =====
+.idea/
+*.iml
+local.properties
+captures/
+
+# ===== 本地配置 (含真实邮箱/授权码, 严禁提交) =====
+app/src/main/assets/config.json
+config.json
+library.json
+
+# ===== 开发工具脚本 (Python, 含 SMTP 凭据) =====
+_tmp/
+_tests/
+
+# ===== 本地 Android SDK / AVD / Gradle 发行版 (环境本身) =====
+_env/
+_env_dl/
+
+# ===== 构建产物目录 =====
+app/build/
+
+# ===== macOS / Windows 杂项 =====
+.DS_Store
+Thumbs.db
+
+# ===== 签名 =====
+*.keystore
+*.jks
+
+# ===== 日志 / 临时文件 =====
+*.log
+tmp/

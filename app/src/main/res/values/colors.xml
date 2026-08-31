@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#FF101418</color>
+    <color name="bg_row">#FF1A1F26</color>
+    <color name="bg_header">#FF202730</color>
+    <color name="bg_row_focused">#FF2A3340</color>
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#FFB0B6BE</color>
+    <color name="accent">#FFFFB300</color>
+    <color name="danger">#FFEF5350</color>
+    <color name="focus_border">#FFFFB300</color>
+    <color name="btn_focused_bg">#FF1E88E5</color>
+    <color name="btn_normal_bg">#FF3C4043</color>
+</resources>

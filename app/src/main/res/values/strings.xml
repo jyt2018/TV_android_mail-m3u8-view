@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">邮箱影院</string>
+    <string name="col_num">编号</string>
+    <string name="action_play">播放</string>
+    <string name="action_delete">删除</string>
+    <string name="action_refresh">刷新</string>
+    <string name="empty_hint">暂无影片。投递一封 [TV投递] 邮件后按刷新键。</string>
+    <string name="confirm_delete">已看过？删除该条目</string>
+    <string name="confirm_ok">再按 OK 确认删除 / 返回取消</string>
+    <string name="fetching">正在拉取邮件…</string>
+    <string name="fetch_done">拉取完成，新增 %1$d 条</string>
+    <string name="fetch_fail">拉取失败：%1$s</string>
+    <string name="play_error">线路不可用：%1$s</string>
+</resources>
