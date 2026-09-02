@@ -1,8 +1,8 @@
-# MailM3U8 TV 设计文档（v0.4.8）
+# MailM3U8 TV 设计文档（v0.6.3）
 
 > TV 端「邮箱投递影片 → 合并到本地 JSON → 列表选择 → 播放 m3u8」
 > 状态：已实现（收片通、UI 打磨中）
-> 日期：2026-09-01
+> 日期：2026-09-02
 
 ---
 
@@ -134,29 +134,66 @@
 
 ---
 
-## 5. UI（单页列表，v0.4.7）
+## 5. UI（v0.6.4）
 
-### 5.1 布局
+### 5.0 页面命名（沟通约定）
+
+| 页面名 | 类 / 布局 | 说明 |
+|---|---|---|
+| **片库页** | `ListActivity` / activity_list | 主页影片列表, 打开 app 即此页 |
+| **播放页** | `PlayerActivity` / activity_player | 在线 HLS 或本地 ts 播放, 头部显示片名 |
+| **搜索页** | `SearchActivity` / activity_search | 界面壳(v0.6.4 设计, 逻辑未实现): 左上角 ← 返回按钮(遥控器返回键等效) + 搜索框 + 搜索按钮 + 结果列表 |
+| **设置弹窗** | 片库页内 `AlertDialog` / dialog_settings | 输入邮箱账号 + 授权码, 确定后写入 config.json (v0.6.4) |
+| **关于弹窗** | 片库页内 `AlertDialog` | 片库页头像图标点击触发: 版本 / 开发者 / 操作使用说明 (v0.6.4) |
+| **下载弹窗** | 片库页内 `AlertDialog` / dialog_download | 先下后播的进度弹窗 (解析→下载分片 x/y→拼接 TS) |
+| **删除确认弹窗** | 片库页内 `AlertDialog` | 确认文案 + 复选框"同时删除已下载内容"(默认勾选) |
+
+### 5.1 片库页布局
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│ 邮箱影院（共3）     ───────────  按遥控器【菜单☰】按钮  [刷新]         v0.4.8 │
-├──────┬───────────────────────────┬─────────┬─────────┬──────┬───────┤
-│ 编号 │ 标题  国家  类型  年份 导演 │ 播放 ▶  │ 删除 ✕  │ ← 表头 │
-├──────┼───────────────────────────┼─────────┼─────────┼──────┼───────┤
-│ 0003 │ 启示录     美国   动作 2006 梅尔吉 | [ 播放 ] │ [ 删除 ]│ ← 选中黄框
-│ 0002 │ 所有邪佞... 美国   -    -   -     │ [ 播放 ] │ [ 删除 ]│
-│ 0001 │ 杰瑞和玛... 美国   -    -   -     │ [ 播放 ] │ [ 删除 ]│
-└──────┴───────────────────────────┴─────────┴─────────┴──────┴───────┘
-  ↑ 72dp  ↑ 120+120+50+160  ↑ 56dp  ↑ 56dp
-          title 自适应 (weight=1) + 固定列宽
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [🐶] 松松看片 (共3) v 0.6.4  ──────  按遥控器【菜单☰】按钮  [刷新🔄] [设置⚙️] [搜索🔎] │
+├────┬──────┬──────────────────────────┬──────────┬────────┬─────────┤
+│已下载│ 编号 │ 标题  国家  类型  年份 导演 │ 在线播放▶ │ 先下后播⤓│ 删除 ✕  │ ← 表头
+├────┼──────┼──────────────────────────┼──────────┼────────┼─────────┤
+│ ✔  │ 0006 │ 守法公民   美国   剧情 2009 F·加里 │[在线播放]│[本地播放]│[删除]│
+│    │ 0005 │ ...                        │[在线播放]│[先下后播]│[删除]│
+└────┴──────┴──────────────────────────┴──────────┴────────┴─────────┘
+  ↑64dp  ↑72dp  ↑120+70+50+160          ↑84dp     ↑84dp    ↑56dp
+         title 自适应 (weight=1) + 固定列宽
 ```
 
+- **标题行**（v0.6.4 重排）：左起为博美头像图标 + 标题 + 小字版本号 + 弹性空白 + 菜单提示 + 刷新/设置/搜索三按钮
+  - **头像图标** `ivIcon`（48dp）：`drawable-*/ic_head.png`，由 `songsong-head.png` 抠白底生成透明背景（脚本 `_tmp/make_head_icon.py`，水印遮盖 + 四角 BFS 清近白连通区 + 边缘细化）。可聚焦，聚焦时黄框（`bg_icon_focus`：3dp #FFD700 12dp 圆角描边）；OK 点击弹**关于弹窗**（版本 v x.y.z(code) / 开发者 jyt2018 / 6 条操作说明）
+  - **版本号**：紧跟标题后小字体（14sp 灰），格式 `v 0.6.4`（v 后带空格），动态读 PackageInfo
+  - **三按钮等宽**（v0.6.4）：刷新🔄 / 设置⚙️ / 搜索🔎，统一 84dp 宽、文字居中、间距 12dp
+  - **设置⚙️**：弹窗预填当前账号/授权码，确定后 `ConfigLoader.save()` 写 `files/config.json`（重启/刷新生效）
+  - **搜索🔎**：进入搜索页（界面壳）
+- **已下载列** (v0.6.1): 该条目存在本地 `编号.ts` 时显示 ✔; 已下载行的"先下后播"按钮文字变为 **"本地播放"**。
 - 表头不可聚焦，纯装饰。**表头与表体列宽共用同一个 `VideoAdapter.buildColumnLayoutParams()` 函数**，天然对齐。
 - 选中行有**橙色外框 + 深灰背景**（`rowRoot.isSelected=true` 触发 `bg_row_selector` 里的 `state_selected`）。按钮聚焦时 rowRoot 失去焦点但 `isSelected` 仍为 true → 黄框保留。
-- **删除了 `>` 箭头**（黄框已足够表达选中态）。
 - 编号列 4 位补零，不可聚焦。
-- 标题行：左标题 + 弹性空白 + 「按遥控器'菜单'按钮」提示文字 + 刷新按钮 + 版本号。
+- 行根布局不可聚焦 → 焦点从表头按下时默认落在"在线播放"按钮上（v0.5.4）。
+
+### 5.1.1 搜索页（v0.6.4 界面设计，逻辑未实现）
+
+```
+┌────────────────────────────────────────────────────────┐
+│ [← 返回]                                                │ ← 左上角, 遥控器返回键等效
+│                                                         │
+│ [输入片名关键词____________________] [搜索]              │ ← 搜索行
+├──────────────────────────────────────────────┬─────────┤
+│ 流浪地球3                                     │ [想看]  │ ← item_search 行
+│ 2027 / 科幻 / 中国                            │         │
+├──────────────────────────────────────────────┼─────────┤
+│ ...                                          │ [想看]  │
+└──────────────────────────────────────────────┴─────────┘
+```
+
+- 返回按钮 `btnBack` → finish；系统返回键同样生效
+- `etKeyword` 搜索框 + `btnSearch` 搜索按钮（点击暂提示"搜索功能开发中"）
+- `rvResults` 结果列表 + `tvEmpty` 空态提示；行布局 `item_search`：标题(粗体, weight=1) + 摘要 + 行尾 **想看** 按钮(84dp)
+- 搜索数据源与"想看"行为待后续实现
 
 ### 5.2 列宽策略
 
@@ -166,33 +203,47 @@
 |---|---|---|
 | title | weight=1 | 自适应剩余空间，超长省略号截断 |
 | country | 120dp | 4 个中文字符 |
-| type | 120dp | 4 个中文字符 |
+| type | 70dp | 2 个中文字符（v0.6.2 由 120 收窄） |
 | year | 50dp | 4 位数字 |
 | director | 160dp | 8 个中文字符，超长截断 |
 | actors / episode | 160dp / 40dp | 同字段复用 |
 
-表头末尾加 2 个零宽占位 View（56dp + 56dp + 6dp marginStart），精确匹配表体播放/删除按钮宽度 → 两边右边界一致。
+按钮区占位（表头末尾零宽 View）：在线播放 84dp + 先下后播/本地播放 84dp + 删除 56dp + 6dp marginStart，精确匹配表体按钮 → 两边右边界一致。
 
 ### 5.3 遥控器焦点
 
 | 操作 | 行为 |
 |---|---|
 | **上/下** | 列表行间移动（RecyclerView 默认） |
-| **右** | 行内：行 root → 播放键 → 删除键；最右键再右 → 下一行 root（RecyclerView 默认） |
-| **左** | 行内：删除键 → 播放键 → 行 root；行 root 左 → 上一行（RecyclerView 默认） |
-| **OK** | 焦点在播放键 → 启动播放器；焦点在删除键 → AlertDialog 二次确认；焦点在刷新键 → 重新拉取 |
+| **右** | 行内：在线播放 → 先下后播 → 删除；删除键再右 → 下一行（RecyclerView 默认） |
+| **左** | 行内：删除键 → 先下后播 → 在线播放；在线播放左 → 上一行（RecyclerView 默认） |
+| **OK** | 焦点在在线播放键 → 播放页(HLS); 先下后播/本地播放 → 下载弹窗或本地播放; 删除键 → 删除确认弹窗; 刷新键 → 重新拉取 |
 | **菜单键** | 全局监听 `KeyEvent.KEYCODE_MENU`（=82），等价于点刷新按钮 |
-| **返回** | 播放中返回列表（停止播放） |
+| **返回** | 播放页返回片库页（停止播放） |
 
-**方向键强制路由**：代码中显式设置了 `rowRoot.nextFocusRightId = btnPlay`、`btnPlay.nextFocusRightId = btnDelete`、`btnPlay.nextFocusLeftId = rowRoot`、`btnDelete.nextFocusLeftId = btnPlay`，避免 Android 默认焦点引擎选错方向。
+**方向键强制路由**：代码中显式设置了 `btnPlay.nextFocusRightId = btnDownloadPlay`、`btnDownloadPlay.nextFocusLeftId = btnPlay`、`btnDownloadPlay.nextFocusRightId = btnDelete`、`btnDelete.nextFocusLeftId = btnDownloadPlay`（v0.6.1 三按钮链），避免 Android 默认焦点引擎选错方向。行根布局不可聚焦（v0.5.4），焦点进入行默认落在 btnPlay。
 
 **选中态管理**：
-- **行内切换焦点**（row ↔ btnPlay ↔ btnDelete）：行 root / 按钮任一获得焦点 → `VideoAdapter.setHighlight(rv, pos)` 给该行 `isSelected=true`（黄框+背景），清其他行
+- **行内切换焦点**（btnPlay ↔ btnDownloadPlay ↔ btnDelete）：任一按钮获得焦点 → `VideoAdapter.setHighlight(rv, pos)` 给该行 `isSelected=true`（黄框+背景），清其他行；判断方式为沿 parent 链找 RV 后代（v0.5.4，焦点在孙子节点按钮上时也能识别）
 - **跳出 RecyclerView**（按 ↑ 到刷新按钮）：ListActivity 的 `OnGlobalFocusChangeListener` 检测 `newFocus` 不在 rvList 内 → `setHighlight(rv, -1)` 清所有行
 
 ### 5.4 按钮样式
 
-三个按钮（刷新/播放/删除）统一：`bg_btn_selector` 背景，`minWidth=0dp minHeight=0dp`（Android Button 默认有 ~48dp minWidth，必须显式设 0 才能缩小），`padding 10dp / 4dp`（横向/纵向），`textSize=14sp`。按钮宽度固定 `56dp`（播放/删除），刷新按钮 `wrap_content`。
+四个行内按钮（在线播放/先下后播/本地播放/删除）统一：`bg_btn_selector` 背景，`minWidth=0dp minHeight=0dp`（Android Button 默认有 ~48dp minWidth，必须显式设 0 才能缩小），`padding 10dp / 4dp`（横向/纵向），`textSize=14sp`。宽度固定：在线播放/先下后播(本地播放) 84dp（4 字文案），删除 56dp；刷新按钮 `wrap_content`。
+
+标题栏三按钮（v0.6.4）：刷新🔄 / 设置⚙️ / 搜索🔎 统一 **84dp 等宽 + gravity 居中**，间距 12dp，同样是 `bg_btn_selector` + `minWidth/minHeight=0dp`。头像图标聚焦态用独立的 `bg_icon_focus`（透明底 + 3dp 黄描边），与按钮的蓝色填充背景区分。
+
+### 5.5 先下后播 / 本地播放（v0.6.x）
+
+**引擎**：`download/M3u8Downloader.kt`，移植自 `H:\downmovie\script\m3u8_download.py`。
+
+- 流程：获取 m3u8（master→子列表）→ 量子源(lz) 广告检测/校验/去除（>6 组或 >30% 判误判跳过）→ 8 线程下载分片（重试 5 次、断点续传、AES-128 解密）→ 二进制拼接 TS → 重命名为 `编号.ts` 播放
+- **不重封装 MP4**（v0.6.2 定案）：曾用 MediaExtractor/MediaMuxer 替代 ffmpeg，但慢（2GB 数分钟）且容错差易出半成品，ExoPlayer 原生支持 MPEG-TS，直接播 TS
+- 产物位置：`Android/data/com.tv.mailvod/files/movies/编号.ts`；临时分片在 `编号_tmp/`，成功后清理
+- 下载弹窗进度：解析（流动条）→ 下载分片 x/y（真实百分比）→ 拼接 TS（流动条）；取消/返回即 cancel
+- **本地播放失败自动切在线**（兜底）：PlayerActivity 收 `EXTRA_FALLBACK_URL`，本地源报错时自动改播 HLS 在线流
+- **删除条目**：删除确认弹窗勾选"同时删除已下载内容"（默认勾选）→ 连带删除 `编号.ts`/残留 `编号.mp4`/`编号_tmp/`
+- 教训：重封装失败分支必须删除半成品 MP4，否则下次被当有效文件播放报 source error（0006 案例）
 
 ---
 
@@ -255,30 +306,42 @@
 ```
 app/src/main/java/com/tv/mailvod/
 ├── ui/
-│   ├── ListActivity.kt        列表页主 Activity + 表头动态填充 + 全局焦点监听
+│   ├── ListActivity.kt        列表页主 Activity + 表头动态填充 + 全局焦点监听 + 设置/关于弹窗
+│   ├── SearchActivity.kt      搜索页界面壳(v0.6.4): 返回按钮 + 搜索框/按钮占位, 逻辑未实现
 │   ├── VideoAdapter.kt        适配器 + 方向键路由 + setHighlight + buildColumnLayoutParams()
 │   └── PlayerActivity.kt      ExoPlayer 播放
 ├── mail/
 │   └── MailFetcher.kt         自写 SSLSocket IMAP 客户端 + MimeMessage 解析
+├── download/
+│   └── M3u8Downloader.kt      m3u8 解析 / 广告滤除 / 多线程分片下载 / AES-128 解密 / TS 拼接
 ├── store/
 │   ├── LibraryStore.kt        library.json 读写 / 合并 / 去重 / 删除
 │   └── VideoItem.kt          数据模型 + 列值映射（含 type 字段）
 ├── config/
 │   ├── Config.kt              配置模型（含 list_columns 动态列表）
-│   └── ConfigLoader.kt        assets/config.json → 私有目录副本（首次启动复制，已有则不覆盖）
+│   └── ConfigLoader.kt        assets/config.json → 私有目录副本（首次启动复制，已有则不覆盖; save() 供设置弹窗写入）
 └── App.kt                     Application 单例
 
 app/src/main/res/
 ├── layout/
-│   ├── activity_list.xml      标题行(刷新+菜单提示+版本) + 表头(编号+llHeaderFields+按钮占位) + RecyclerView
-│   └── item_video.xml         编号(72dp) + llFields(weight=1) + btnPlay(56dp) + btnDelete(56dp)
-└── drawable/
-    ├── bg_row_selector.xml    state_focused/state_selected → 黄框; default → 深灰背景
-    ├── bg_btn_selector.xml    state_focused/state_pressed → 蓝色背景
-    ├── bg_row_focused.xml     圆角4dp + 2dp黄色边框
-    └── bg_row_normal.xml      圆角4dp + 深灰背景
+│   ├── activity_list.xml      标题行(头像+标题+版本+刷新/设置/搜索) + 表头(编号+llHeaderFields+按钮占位) + RecyclerView
+│   ├── item_video.xml         编号(72dp) + llFields(weight=1) + 行内按钮
+│   ├── activity_search.xml    搜索页: 返回按钮 + 搜索框/搜索按钮 + 结果列表 + 空态
+│   ├── item_search.xml        搜索结果行: 标题(weight=1) + 摘要 + 想看按钮(84dp)
+│   └── dialog_settings.xml    设置弹窗: 邮箱账号 / 授权码两个输入框
+├── drawable/
+│   ├── ic_head.png            博美头像(mdpi/hdpi/xhdpi/xxhdpi 四密度, 透明背景, 由 _tmp/make_head_icon.py 生成)
+│   ├── bg_icon_focus.xml      头像聚焦黄框(3dp #FFD700 12dp 圆角描边)
+│   ├── bg_row_selector.xml    state_focused/state_selected → 黄框; default → 深灰背景
+│   ├── bg_btn_selector.xml    state_focused/state_pressed → 蓝色背景
+│   ├── bg_row_focused.xml     圆角4dp + 2dp黄色边框
+│   └── bg_row_normal.xml      圆角4dp + 深灰背景
+├── mipmap-*/ic_launcher.png   桌面图标(songsong.png 生成, _tmp/make_icons.py)
+└── drawable-xhdpi/ic_banner.png  TV 桌面 banner 640x360
 
 _tmp/
+├── make_icons.py              桌面图标/banner 生成（水印遮盖 + 多密度缩放）
+├── make_head_icon.py          标题头像生成（抠白底透明 + 多密度）
 ├── send_body_mail.py          正文 JSON 测试邮件发送器（读同目录 library.json，自动追加 **********）
 ├── send_test_mail.py          附件 JSON 测试邮件发送器
 ├── imap_test.py               IMAP 连接 / 授权码测试脚本
@@ -288,7 +351,7 @@ _tmp/
 
 技术栈：Kotlin + RecyclerView + ExoPlayer 2.18.5 + OkHttp 4.9.3 + kotlinx.serialization + android-mail 1.6.7。
 
-minSdk 21 / targetSdk 34 / compileSdk 34。
+minSdk 21 / targetSdk 34 / compileSdk 34。版本号 0.6.4 / versionCode 29；APK 产物 `app/build/outputs/apk/debug/songmovie.apk`（debug 签名）。
 
 ---
 
@@ -311,6 +374,11 @@ minSdk 21 / targetSdk 34 / compileSdk 34。
 | 按遥控器「菜单」键 | 触发刷新 |
 | 表头表体列对齐 | OK（共用 buildColumnLayoutParams + 按钮占位） |
 | 按钮尺寸缩小 | OK（minWidth=0dp + padding 10/4） |
+| 标题行显示 [头像] 松松看片 (共x) v 0.6.4 + 刷新🔄/设置⚙️/搜索🔎 三等宽按钮 | OK（v0.6.4） |
+| 头像透明背景 PNG；遥控器焦点移上出现黄框 | OK（bg_icon_focus 3dp 黄描边） |
+| OK 点头像 → 关于弹窗（版本/开发者/操作说明），OK 或返回关闭 | OK |
+| 设置⚙️ → 弹窗预填账号/授权码，修改确定后 config.json 更新 | OK（ConfigLoader.save） |
+| 搜索🔎 → 进入搜索页；返回按钮 / 遥控器返回键回片库页 | OK（搜索逻辑未实现，点搜索提示开发中） |
 
 ---
 

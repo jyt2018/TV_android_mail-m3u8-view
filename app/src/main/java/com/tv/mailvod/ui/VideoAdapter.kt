@@ -15,8 +15,8 @@ import com.tv.mailvod.store.VideoItem
 import kotlin.math.roundToInt
 
 /**
- * 列表适配器: 每行 = 箭头固定列 | 编号固定列 | 字段列(固定宽度+weight混合) | 播放按钮 | 删除按钮。
- * 选中行 = rowRoot focused OR btnPlay focused OR btnDelete focused
+ * 列表适配器: 每行 = 箭头固定列 | 已下载✔固定列 | 编号固定列 | 字段列(固定宽度+weight混合) | 在线播放 | 先下后播/本地播放 | 删除。
+ * 选中行 = btnPlay/btnDownloadPlay/btnDelete 任一 focused (rowRoot 不可聚焦)
  *         → rowRoot.isSelected=true(黄框保留) + 箭头显示 ">"
  * 通过 setHighlight(pos) 统一清除所有行高亮后再设置目标行,避免两行同时亮。
  *
@@ -27,14 +27,23 @@ import kotlin.math.roundToInt
 class VideoAdapter(
     private val config: Config,
     private val onPlay: (VideoItem) -> Unit,
+    private val onDownloadPlay: (VideoItem) -> Unit,
     private val onDelete: (VideoItem) -> Unit
 ) : RecyclerView.Adapter<VideoAdapter.VH>() {
 
     private val items = mutableListOf<VideoItem>()
+    private val downloaded = HashSet<String>()
 
     fun submit(list: List<VideoItem>) {
         items.clear()
         items.addAll(list)
+        notifyDataSetChanged()
+    }
+
+    /** 更新已下载集合 (displayId), 行内 ✔ 与 "本地播放" 按钮文字随之刷新。 */
+    fun setDownloaded(ids: Set<String>) {
+        downloaded.clear()
+        downloaded.addAll(ids)
         notifyDataSetChanged()
     }
 
@@ -56,26 +65,31 @@ class VideoAdapter(
                 val pos = bindingAdapterPosition
                 if (pos != RecyclerView.NO_POSITION) onPlay(items[pos])
             }
+            binding.btnDownloadPlay.setOnClickListener {
+                val pos = bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION) onDownloadPlay(items[pos])
+            }
             binding.btnDelete.setOnClickListener {
                 val pos = bindingAdapterPosition
                 if (pos != RecyclerView.NO_POSITION) onDelete(items[pos])
             }
 
-            // 方向键: row ↔ btnPlay ↔ btnDelete
-            binding.rowRoot.nextFocusRightId = R.id.btnPlay
-            binding.btnPlay.nextFocusRightId = R.id.btnDelete
-            binding.btnPlay.nextFocusLeftId = R.id.rowRoot
-            binding.btnDelete.nextFocusLeftId = R.id.btnPlay
+            // 方向键: btnPlay ↔ btnDownloadPlay ↔ btnDelete
+            // (rowRoot 不可聚焦, 焦点进入行时默认落在 btnPlay "直接播放" 上)
+            binding.btnPlay.nextFocusRightId = R.id.btnDownloadPlay
+            binding.btnDownloadPlay.nextFocusRightId = R.id.btnDelete
+            binding.btnDownloadPlay.nextFocusLeftId = R.id.btnPlay
+            binding.btnDelete.nextFocusLeftId = R.id.btnDownloadPlay
 
-            // 任何一个控件获得焦点时,统一刷新所有行高亮
+            // 任何一个按钮获得焦点时,统一刷新所有行高亮
             val focusTarget = { pos: Int ->
                 val rv = binding.rowRoot.parent as? RecyclerView
                 if (rv != null) setHighlight(rv, pos)
             }
-            binding.rowRoot.onFocusChangeListener = View.OnFocusChangeListener { _, has ->
+            binding.btnPlay.onFocusChangeListener = View.OnFocusChangeListener { _, has ->
                 if (has) focusTarget(bindingAdapterPosition)
             }
-            binding.btnPlay.onFocusChangeListener = View.OnFocusChangeListener { _, has ->
+            binding.btnDownloadPlay.onFocusChangeListener = View.OnFocusChangeListener { _, has ->
                 if (has) focusTarget(bindingAdapterPosition)
             }
             binding.btnDelete.onFocusChangeListener = View.OnFocusChangeListener { _, has ->
@@ -107,7 +121,12 @@ class VideoAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
+        val isDownloaded = item.displayId in downloaded
+        holder.binding.tvDownloaded.text = if (isDownloaded) "✔" else ""
         holder.binding.tvNum.text = item.displayId
+        holder.binding.btnDownloadPlay.text = holder.binding.root.context.getString(
+            if (isDownloaded) R.string.action_local_play else R.string.action_download_play
+        )
         val cols = config.listColumnsNormalized
         for (i in cols.indices) {
             val tv = holder.binding.llFields.getChildAt(i) as TextView
@@ -132,7 +151,7 @@ class VideoAdapter(
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
                 )
                 "country" -> LinearLayout.LayoutParams(dp(120), LinearLayout.LayoutParams.WRAP_CONTENT)
-                "type"    -> LinearLayout.LayoutParams(dp(120), LinearLayout.LayoutParams.WRAP_CONTENT)
+                "type"    -> LinearLayout.LayoutParams(dp(70), LinearLayout.LayoutParams.WRAP_CONTENT)
                 "year"    -> LinearLayout.LayoutParams(dp(50), LinearLayout.LayoutParams.WRAP_CONTENT)
                 "director"-> LinearLayout.LayoutParams(dp(160), LinearLayout.LayoutParams.WRAP_CONTENT)
                 "actors"  -> LinearLayout.LayoutParams(dp(160), LinearLayout.LayoutParams.WRAP_CONTENT)

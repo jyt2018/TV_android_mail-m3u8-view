@@ -121,6 +121,7 @@ class MailFetcher {
 
     private fun extractJsonFromMultipart(mp: Multipart): String {
         var fallbackBody = ""
+        var htmlBody = ""
         for (i in 0 until mp.count) {
             val part = mp.getBodyPart(i)
             val ct = part.contentType.orEmpty().lowercase()
@@ -141,13 +142,31 @@ class MailFetcher {
                     if (json.isNotBlank()) return json
                 }
             }
-            // 收集 text/plain 作为 fallback
+            // 收集 text/plain 作为 fallback, text/html 兜底
             if (ct.startsWith("text/plain") && fallbackBody.isBlank()) {
                 fallbackBody = readPartText(part)
+            } else if (ct.startsWith("text/html") && htmlBody.isBlank()) {
+                htmlBody = readPartText(part)
             }
         }
-        Log.i("MailFetcher", "  no attachment, fallback to text/plain len=${fallbackBody.length}")
-        return fallbackBody
+        Log.i("MailFetcher", "  no attachment, fallback to text/plain len=${fallbackBody.length}, html len=${htmlBody.length}")
+        return fallbackBody.ifBlank { stripHtml(htmlBody) }
+    }
+
+    /** 剥离 HTML 标签与常见实体, 还原纯文本 (QQ邮箱/手机端常把正文转成 text/html)。 */
+    private fun stripHtml(text: String): String {
+        if (!text.contains('<') && !text.contains('&')) return text
+        return text
+            .replace(Regex("(?is)<br\\s*/?>"), "\n")
+            .replace(Regex("(?is)</(p|div|tr|li)>"), "\n")
+            .replace(Regex("(?is)<[^>]*>"), "")
+            .replace("&nbsp;", " ")
+            .replace("\u00A0", " ")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+            .replace("&amp;", "&")
     }
 
     private fun readPartText(part: javax.mail.BodyPart): String {
@@ -162,7 +181,9 @@ class MailFetcher {
     /** 从 JSON 文本解析 VideoItem 列表。
      *  优先级: 分隔符 ********** 之前的内容 → 直接以 [ 或 { 开头的 JSON → 正则 fallback。
      */
-    private fun parseVideos(text: String): List<VideoItem> {
+    private fun parseVideos(rawText: String): List<VideoItem> {
+        // QQ邮箱/手机客户端可能把正文转成 text/html, 先剥掉 HTML 标签
+        val text = stripHtml(rawText)
         if (text.isBlank()) {
             Log.w("MailFetcher", "json 文本为空")
             return emptyList()
@@ -214,6 +235,7 @@ class MailFetcher {
             episode = obj["episode"]?.jsonPrimitive?.intOrNull ?: 0,
             year = obj["year"]?.jsonPrimitive?.intOrNull,
             country = obj["country"]?.jsonPrimitive?.contentOrNull,
+            type = obj["type"]?.jsonPrimitive?.contentOrNull,
             director = obj["director"]?.jsonPrimitive?.contentOrNull,
             actors = obj["actors"]?.jsonPrimitive?.contentOrNull,
             url = url,

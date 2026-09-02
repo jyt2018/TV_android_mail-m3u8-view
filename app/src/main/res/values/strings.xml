@@ -1,10 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">邮箱影院</string>
+    <string name="app_name">松松看片</string>
     <string name="col_num">编号</string>
-    <string name="action_play">播放</string>
+    <string name="action_play">在线播放</string>
+    <string name="action_download_play">先下后播</string>
+    <string name="action_local_play">本地播放</string>
+    <string name="dl_col_downloaded">已下载</string>
+    <string name="dl_title">先下后播</string>
+    <string name="dl_exists">已下载过，直接播放</string>
+    <string name="dl_stage_parse">正在解析播放列表…</string>
+    <string name="dl_switch_online">本地播放失败，切换在线播放</string>
+    <string name="dl_del_also">同时删除已下载内容</string>
+    <string name="dl_failed">先下后播失败：%1$s</string>
     <string name="action_delete">删除</string>
-    <string name="action_refresh">刷新</string>
+    <string name="action_refresh">刷新🔄</string>
+    <string name="action_settings">设置⚙️</string>
+    <string name="action_search">搜索🔎</string>
+    <string name="action_back">← 返回</string>
+    <string name="settings_title">邮箱设置</string>
+    <string name="settings_user_hint">邮箱账号</string>
+    <string name="settings_auth_hint">邮箱授权码</string>
+    <string name="settings_saved">设置已保存</string>
+    <string name="search_hint">输入片名关键词</string>
+    <string name="search_btn">搜索</string>
+    <string name="search_empty_hint">输入关键词后按【搜索】</string>
+    <string name="search_todo">搜索功能开发中</string>
+    <string name="want_watch">想看</string>
+    <string name="about_title">关于 松松看片</string>
+    <string name="about_developer">开发者：jyt2018</string>
+    <string name="about_usage">操作说明：\n1. 上下键选片，OK 键播放在线视频\n2. 行内左右移动可选【先下后播】【删除】\n3. 遥控器菜单键(☰) = 刷新片库\n4. 设置⚙️：配置邮箱账号与授权码\n5. 搜索🔎：全网找片（开发中）\n6. 投递：发一封标题带 [TV投递] 的邮件，正文为 [{\"title\":…,\"url\":…}] JSON 数组，按刷新即入库</string>
     <string name="empty_hint">暂无影片。投递一封 [TV投递] 邮件后按刷新键。</string>
     <string name="confirm_delete">已看过？删除该条目</string>
     <string name="confirm_ok">再按 OK 确认删除 / 返回取消</string>

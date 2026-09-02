@@ -5,13 +5,26 @@
     android:orientation="vertical"
     android:background="@color/bg">
 
-    <!-- 标题行: 左标题 + 中弹性 + 右刷新按钮 + 右版本号 -->
+    <!-- 标题行: 左标题 + 标题后小字版本号 + 中弹性 + 右刷新/设置/搜索按钮 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:padding="16dp">
+
+        <!-- 头像图标: 点击弹关于窗, 聚焦显示黄框 -->
+        <ImageView
+            android:id="@+id/ivIcon"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="10dp"
+            android:background="@drawable/bg_icon_focus"
+            android:contentDescription="@string/app_name"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:padding="3dp"
+            android:src="@drawable/ic_head" />
 
         <TextView
             android:id="@+id/tvTitle"
@@ -21,6 +34,16 @@
             android:textColor="@color/text_primary"
             android:textSize="22sp"
             android:textStyle="bold" />
+
+        <!-- 版本号: 紧跟标题后, 小字体 -->
+        <TextView
+            android:id="@+id/tvVersion"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text=""
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
 
         <View
             android:layout_width="0dp"
@@ -37,28 +60,50 @@
 
         <Button
             android:id="@+id/btnRefresh"
-            android:layout_width="wrap_content"
+            android:layout_width="84dp"
             android:layout_height="wrap_content"
             android:focusable="true"
             android:focusableInTouchMode="true"
             android:background="@drawable/bg_btn_selector"
+            android:gravity="center"
             android:textSize="14sp"
             android:minWidth="0dp"
             android:minHeight="0dp"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
             android:paddingTop="4dp"
             android:paddingBottom="4dp"
             android:text="@string/action_refresh" />
 
-        <TextView
-            android:id="@+id/tvVersion"
-            android:layout_width="wrap_content"
+        <Button
+            android:id="@+id/btnSettings"
+            android:layout_width="84dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
-            android:text=""
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp" />
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:background="@drawable/bg_btn_selector"
+            android:gravity="center"
+            android:textSize="14sp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text="@string/action_settings" />
+
+        <Button
+            android:id="@+id/btnSearch"
+            android:layout_width="84dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:background="@drawable/bg_btn_selector"
+            android:gravity="center"
+            android:textSize="14sp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text="@string/action_search" />
     </LinearLayout>
 
     <!-- 表头行: 结构与 item_video.xml 完全一致 (不含按钮,用等宽占位) -->
@@ -72,6 +117,16 @@
         android:paddingEnd="10dp"
         android:paddingTop="6dp"
         android:paddingBottom="6dp">
+
+        <!-- 已下载列占位 (64dp, 与表体 tvDownloaded 同宽) -->
+        <TextView
+            android:layout_width="64dp"
+            android:layout_height="wrap_content"
+            android:text="@string/dl_col_downloaded"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:gravity="center" />
 
         <TextView
             android:layout_width="72dp"
@@ -90,10 +145,16 @@
             android:orientation="horizontal"
             android:gravity="center_vertical" />
 
-        <!-- 播放按钮占位 (56dp, 与表体 btnPlay 同宽) -->
+        <!-- 直接播放按钮占位 (84dp, 与表体 btnPlay 同宽) -->
         <View
-            android:layout_width="56dp"
+            android:layout_width="84dp"
             android:layout_height="1dp" />
+
+        <!-- 先下后播按钮占位 (84dp + 6dp marginStart, 与表体 btnDownloadPlay 同宽) -->
+        <View
+            android:layout_width="84dp"
+            android:layout_height="1dp"
+            android:layout_marginStart="6dp" />
 
         <!-- 删除按钮占位 (56dp + 6dp marginStart, 与表体 btnDelete 同宽) -->
         <View

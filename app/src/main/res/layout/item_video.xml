@@ -5,11 +5,17 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:focusable="true"
-    android:focusableInTouchMode="true"
-    android:clickable="true"
     android:background="@drawable/bg_row_selector"
     android:padding="10dp">
+
+    <!-- 已下载标记列,固定 64dp -->
+    <TextView
+        android:id="@+id/tvDownloaded"
+        android:layout_width="64dp"
+        android:layout_height="wrap_content"
+        android:textColor="@color/text_primary"
+        android:textSize="16sp"
+        android:gravity="center" />
 
     <!-- 编号列,固定 72dp (6字符 monospace) -->
     <TextView
@@ -32,7 +38,7 @@
 
     <Button
         android:id="@+id/btnPlay"
-        android:layout_width="56dp"
+        android:layout_width="84dp"
         android:layout_height="wrap_content"
         android:focusable="true"
         android:focusableInTouchMode="true"
@@ -45,6 +51,23 @@
         android:paddingTop="4dp"
         android:paddingBottom="4dp"
         android:text="@string/action_play" />
+
+    <Button
+        android:id="@+id/btnDownloadPlay"
+        android:layout_width="84dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:background="@drawable/bg_btn_selector"
+        android:textSize="14sp"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:text="@string/action_download_play" />
 
     <Button
         android:id="@+id/btnDelete"
