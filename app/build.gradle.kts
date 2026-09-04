@@ -12,8 +12,8 @@ android {
         applicationId = "com.tv.mailvod"
         minSdk = 21
         targetSdk = 34
-        versionCode = 29
-        versionName = "0.6.4"
+        versionCode = 36
+        versionName = "0.7.2"
     }
 
     buildTypes {

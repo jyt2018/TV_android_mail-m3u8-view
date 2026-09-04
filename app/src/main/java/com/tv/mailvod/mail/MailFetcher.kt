@@ -17,9 +17,13 @@ import java.io.InputStream
 import java.io.OutputStreamWriter
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.nio.ByteBuffer
+import java.nio.charset.Charset
+import java.nio.charset.CodingErrorAction
 import javax.mail.Multipart
 import javax.mail.Session
 import javax.mail.internet.MimeMessage
+import javax.mail.internet.MimeUtility
 import javax.mail.util.ByteArrayDataSource
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
@@ -111,7 +115,7 @@ class MailFetcher {
         // 单 part 邮件
         return when (content) {
             is String -> content
-            is InputStream -> runCatching { content.bufferedReader().use { it.readText() } }.getOrDefault("")
+            is InputStream -> decodeBytes(content.readBytes(), charsetFromContentType(ct))
             else -> runCatching {
                 val ds = ByteArrayDataSource(msg.inputStream, ct.ifBlank { "text/plain" })
                 javax.mail.internet.MimeMultipart(ds).let { extractJsonFromMultipart(it) }
@@ -169,13 +173,39 @@ class MailFetcher {
             .replace("&amp;", "&")
     }
 
-    private fun readPartText(part: javax.mail.BodyPart): String {
-        val c = runCatching { part.content }.getOrNull()
-        return when (c) {
-            is String -> c
-            is InputStream -> runCatching { c.bufferedReader().use { it.readText() } }.getOrDefault("")
-            else -> ""
+    private fun readPartText(part: javax.mail.Part): String {
+        // 字节级解码: getInputStream() = CTE(base64/QP) 已解码、charset 未解码的原始字节。
+        // 不信 part.content 的 String —— 163 网页版发 charset=gbk 邮件时曾被按 UTF-8 强解成乱码。
+        val bytes = runCatching { part.getInputStream().readBytes() }
+            .getOrElse { return runCatching { part.content as? String ?: "" }.getOrDefault("") }
+        return decodeBytes(bytes, charsetFromContentType(part.contentType))
+    }
+
+    /** 从 Content-Type 头提取并规范化 charset 参数。 */
+    private fun charsetFromContentType(ct: String): String? {
+        val raw = ct.substringAfter("charset=", "").substringBefore(";").trim().trim('"', '\'')
+        if (raw.isBlank()) return null
+        val name = runCatching { MimeUtility.javaCharset(raw) }.getOrNull() ?: raw
+        return runCatching { Charset.forName(name).name() }.getOrNull()
+    }
+
+    /** 按候选 charset 严格解码字节: 声明 charset → UTF-8 → GBK; 全失败时用首个候选宽松解码兜底。 */
+    private fun decodeBytes(bytes: ByteArray, declared: String?): String {
+        val candidates = listOfNotNull(declared, "UTF-8", "GBK")
+            .mapNotNull { n -> runCatching { Charset.forName(n) }.getOrNull() }
+            .distinctBy { it.name() }
+        for (cs in candidates) {
+            val strict = runCatching {
+                cs.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes))
+                    .toString()
+            }.getOrNull()
+            if (strict != null) return strict
         }
+        val fallback = candidates.firstOrNull() ?: Charsets.UTF_8
+        return String(bytes, fallback)
     }
 
     /** 从 JSON 文本解析 VideoItem 列表。

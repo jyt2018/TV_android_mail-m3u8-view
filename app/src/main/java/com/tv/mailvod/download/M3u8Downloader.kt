@@ -257,7 +257,22 @@ class M3u8Downloader(
 
     // ═══════════════════════ HTTP 工具 ═══════════════════════
 
+    /** 线程池: 给 httpGet 提供硬超时护栏 (connectTimeout 不覆盖 DNS 解析, DNS 挂起会卡到 OS 级超时)。 */
+    private val httpExec = Executors.newCachedThreadPool()
+
     private fun httpGet(urlStr: String): ByteArray {
+        val future = httpExec.submit(java.util.concurrent.Callable { httpGetImpl(urlStr) })
+        return try {
+            future.get(45, java.util.concurrent.TimeUnit.SECONDS)
+        } catch (e: java.util.concurrent.TimeoutException) {
+            future.cancel(true)
+            throw IOException("请求超时(45s): $urlStr")
+        } catch (e: java.util.concurrent.ExecutionException) {
+            throw (e.cause as? Exception) ?: IOException(e.message ?: "download failed")
+        }
+    }
+
+    private fun httpGetImpl(urlStr: String): ByteArray {
         var conn: HttpURLConnection? = null
         try {
             conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {

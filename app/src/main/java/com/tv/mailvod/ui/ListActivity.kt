@@ -18,6 +18,7 @@ import com.tv.mailvod.R
 import com.tv.mailvod.databinding.ActivityListBinding
 import com.tv.mailvod.download.M3u8Downloader
 import com.tv.mailvod.mail.MailFetcher
+import com.tv.mailvod.store.ProgressStore
 import com.tv.mailvod.store.VideoItem
 import kotlinx.coroutines.launch
 import java.io.File
@@ -40,6 +41,13 @@ class ListActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        App.instance.configLoader.ensureLoaded()
+        // 首次安装(无配置) → 配置向导, 输完回来自动重走 onCreate
+        if (App.instance.configLoader.config.mail.user.isBlank()) {
+            startActivity(android.content.Intent(this, SetupActivity::class.java))
+            finish()
+            return
+        }
         binding = ActivityListBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.tvTitle.text = getString(R.string.app_name)
@@ -106,11 +114,74 @@ class ListActivity : ComponentActivity() {
         if (App.instance.configLoader.config.mail.user.isNotBlank()) doRefresh()
     }
 
+    /** 弹"发现新版本"对话框, 确认后调系统安装器(FileProvider 暴露 cacheDir/update.apk)。 */
+    private fun promptUpdateInstall(apk: java.io.File) {
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            this, "${packageName}.fileprovider", apk
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.update_found)
+            .setMessage(R.string.update_msg)
+            .setPositiveButton(R.string.update_install) { _, _ ->
+                runCatching {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_INSTALL_PACKAGE, uri)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    startActivity(intent)
+                }.onFailure { Toast.makeText(this, it.message, Toast.LENGTH_LONG).show() }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     override fun onResume() {
         super.onResume()
         loadList()
         if (App.instance.configLoader.config.mail.user.isBlank()) {
-            Toast.makeText(this, "请先 adb push config.json", Toast.LENGTH_LONG).show()
+            startActivity(Intent(this, SetupActivity::class.java))
+        }
+        // 自动检查更新(TV 上按返回退出进程常驻, onCreate 不再重跑 → 挪到 onResume + 30 分钟节流)
+        if (System.currentTimeMillis() -
+            getSharedPreferences("update", MODE_PRIVATE).getLong("last_check", 0) > 30 * 60 * 1000L
+        ) checkUpdate(manual = false)
+    }
+
+    /**
+     * 检查 Gitee 更新; 有新版下载并弹安装窗。
+     * manual=true 时绕过节流并给"已是最新/检查失败"反馈(关于对话框按钮)。
+     */
+    private fun checkUpdate(manual: Boolean) {
+        getSharedPreferences("update", MODE_PRIVATE).edit()
+            .putLong("last_check", System.currentTimeMillis()).apply()
+        if (manual) Toast.makeText(this, R.string.update_checking, Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch {
+            val checker = com.tv.mailvod.net.UpdateChecker(applicationContext)
+            val info = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                checker.fetchRemoteVersion()
+            }
+            if (info == null) {
+                if (manual) Toast.makeText(this@ListActivity, R.string.update_check_fail,
+                    Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            val local = runCatching {
+                packageManager.getPackageInfo(packageName, 0).versionCode
+            }.getOrDefault(0)
+            if (info.versionCode <= local) {
+                if (manual) Toast.makeText(this@ListActivity,
+                    getString(R.string.update_latest, info.versionName),
+                    Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            val apk = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                checker.downloadUpdate(info)
+            }
+            if (apk == null) {
+                if (manual) Toast.makeText(this@ListActivity, R.string.update_download_fail,
+                    Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            promptUpdateInstall(apk)
         }
     }
 
@@ -172,6 +243,7 @@ class ListActivity : ComponentActivity() {
             .setIcon(R.drawable.ic_head)
             .setMessage(message)
             .setPositiveButton(android.R.string.ok, null)
+            .setNeutralButton(R.string.update_check) { _, _ -> checkUpdate(manual = true) }
             .show()
     }
 
@@ -213,19 +285,22 @@ class ListActivity : ComponentActivity() {
                 setPadding(0, (12 * dp).toInt(), 0, 0)
             })
         }
-        AlertDialog.Builder(this)
+        val dlg = AlertDialog.Builder(this)
             .setTitle(R.string.confirm_delete)
             .setView(wrap)
             .setPositiveButton(R.string.action_delete) { _, _ ->
                 val alsoFiles = wrap.getChildAt(1) as CheckBox
                 lifecycleScope.launch {
                     App.instance.library.delete(item.id)
+                    App.instance.progress.remove(ProgressStore.keyOf(item.title, item.episode))
                     if (alsoFiles.isChecked) deleteLocalFiles(item.displayId)
                     loadList()
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+        // 遥控器场景: 默认焦点落在"删除"按钮上, 避免焦点停在正文/取消键
+        dlg.getButton(AlertDialog.BUTTON_POSITIVE).requestFocus()
     }
 
     /** 删除条目对应的本地文件 (编号.ts/mp4 + 临时分片目录)。 */

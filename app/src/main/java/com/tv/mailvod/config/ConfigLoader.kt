@@ -7,7 +7,8 @@ import java.io.File
 /**
  * 读取/持久化 config.json。
  * 路径：/data/data/<包名>/files/config.json
- * 首次启动若不存在则从 assets 复制一份（带默认值与真实授权码）。
+ * 首次启动不存在 → config.user 为空 → ListActivity 跳转 SetupActivity 由用户遥控器输入。
+ * APK 不再打包 assets/config.json（防逆向泄露授权码）。
  *
  * 后续可用 adb push config.json /data/data/<包名>/files/ 覆盖更新。
  */
@@ -21,16 +22,9 @@ class ConfigLoader(private val context: Context) {
     var config: Config = Config(Config.Mail())
         private set
 
-    /** 首次启动从 assets 复制；已存在则直接读取。 */
+    /** 已存在则读取；不存在返回空配置(user 为空, 由 SetupActivity 填写)。 */
     @Synchronized
     fun ensureLoaded(): Config {
-        if (!targetFile.exists()) {
-            runCatching {
-                context.assets.open("config.json").use { input ->
-                    targetFile.outputStream().use { output -> input.copyTo(output) }
-                }
-            }
-        }
         config = load()
         return config
     }
@@ -47,15 +41,9 @@ class ConfigLoader(private val context: Context) {
             val text = if (targetFile.exists()) targetFile.readText() else return Config(Config.Mail())
             json.decodeFromString(Config.serializer(), text)
         }.getOrElse {
-            // 损坏时用 assets 重新生成
-            runCatching {
-                context.assets.open("config.json").use { input ->
-                    targetFile.outputStream().use { output -> input.copyTo(output) }
-                }
-            }
-            val text = targetFile.takeIf { it.exists() }?.readText().orEmpty()
-            if (text.isBlank()) Config(Config.Mail())
-            else json.decodeFromString(Config.serializer(), text)
+            // 损坏时清空重写, 让用户重新走 SetupActivity
+            runCatching { targetFile.delete() }
+            Config(Config.Mail())
         }
     }
 

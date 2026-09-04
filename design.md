@@ -390,3 +390,14 @@ minSdk 21 / targetSdk 34 / compileSdk 34。版本号 0.6.4 / versionCode 29；AP
 - [ ] 正文模式下不强制分隔符也行（已 fallback 正则捕获），但分隔符更稳
 - [ ] headers 白名单（仅允许 UA/Referer/Origin/Cookie）
 - [ ] ConfigLoader 支持通过 adb 覆盖 config.json（目前需要卸载重装才能更新）
+
+### 10.1 删除条目被邮件刷新回刷（2026-09-04 讨论定方案，暂不实施）
+
+**问题**：电视端删除某电影只操作本地 library.json；邮箱里对应邮件仍在，下次刷新（启动自动刷新/菜单键）重新解析后，本地查无此片 → 按"新片"插回列表。
+
+**已定方案（墓碑清单）**：
+- library.json 增加 `deleted` 数组，存被删条目的 key（title+episode，或含 url 增强唯一性）
+- `LibraryStore.delete` 删除条目的同时写入墓碑
+- `LibraryStore.merge` 在"新片编号 max+1"判断之前先查墓碑，命中则跳过（且不重复覆盖墓碑）
+- 已知代价：重装 app 后 files 目录清空，墓碑丢失 → 重装全量重建时被删片会回来（家用场景可接受；如不可接受再叠加"已处理邮件 UID 记录"方案，但会破坏全量重建能力，不推荐）
+- UI 可选增强：设置页显示墓碑清单，支持"恢复"单个条目（移出墓碑）

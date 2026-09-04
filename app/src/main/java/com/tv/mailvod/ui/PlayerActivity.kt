@@ -12,6 +12,7 @@ import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.source.MediaSource
 import com.google.android.exoplayer2.source.hls.HlsMediaSource
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
+import com.tv.mailvod.App
 import com.tv.mailvod.R
 import com.tv.mailvod.databinding.ActivityPlayerBinding
 import java.io.File
@@ -29,6 +30,16 @@ class PlayerActivity : ComponentActivity() {
     private var fallbackUrl: String? = null
     private var headers: Map<String, String> = emptyMap()
     private var fallbackUsed = false
+    private lateinit var progressKey: String
+
+    // 继续播放: 内存实时进度 + 每10s落盘 + onPause/onDestroy 必存
+    private val saveHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val saveRunnable = object : Runnable {
+        override fun run() {
+            saveProgress()
+            saveHandler.postDelayed(this, 10_000)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,11 +59,19 @@ class PlayerActivity : ComponentActivity() {
     }
 
     private fun play(url: String, title: String) {
+        progressKey = title
         isLocal = url.startsWith("/") || url.startsWith("file:")
         val uri = if (isLocal && !url.startsWith("file:")) Uri.fromFile(File(url)) else Uri.parse(url)
         val mediaItem = MediaItem.Builder().setUri(uri).build()
 
         player = ExoPlayer.Builder(this).build()
+        // 继续播放: 有未完成进度则先定位再 prepare
+        val saved = App.instance.progress.get(progressKey)
+        if (saved != null && saved.positionMs > 0) {
+            player?.seekTo(saved.positionMs)
+            Toast.makeText(this, getString(R.string.resume_from, fmtTime(saved.positionMs)),
+                Toast.LENGTH_SHORT).show()
+        }
         if (isLocal) {
             // 本地文件 (mp4/ts), 让 ExoPlayer 按容器自动推断媒体源
             player?.setMediaItem(mediaItem)
@@ -63,6 +82,7 @@ class PlayerActivity : ComponentActivity() {
         player?.playWhenReady = true
         binding.playerView.player = player
         binding.playerView.keepScreenOn = true
+        saveHandler.post(saveRunnable)
 
         player?.addListener(object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
@@ -81,6 +101,22 @@ class PlayerActivity : ComponentActivity() {
                 finish()
             }
         })
+    }
+
+    /** 节流落盘; 看完(>=98% 或剩<30s)自动清除进度。 */
+    private fun saveProgress() {
+        val p = player ?: return
+        val pos = p.currentPosition
+        val dur = p.duration
+        if (pos <= 0) return
+        App.instance.progress.save(progressKey, pos, dur)
+    }
+
+    /** ms → h:mm:ss / mm:ss。 */
+    private fun fmtTime(ms: Long): String {
+        val s = ms / 1000
+        return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s % 3600 / 60, s % 60)
+        else "%d:%02d".format(s / 60, s % 60)
     }
 
     private fun hlsSourceFor(uri: Uri): MediaSource =
@@ -102,10 +138,13 @@ class PlayerActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         player?.pause()
+        saveProgress()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        saveHandler.removeCallbacks(saveRunnable)
+        saveProgress()
         player?.release()
         player = null
     }
