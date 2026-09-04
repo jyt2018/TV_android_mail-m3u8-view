@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 手机版主题: AppCompat 系(TV 版用 Theme.Leanback 系, 见 src/tv/res/values/themes.xml) -->
+<resources>
+
+    <style name="Theme.MailM3U8" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+    </style>
+
+    <style name="Theme.MailM3U8.Fullscreen" parent="Theme.MailM3U8">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+</resources>

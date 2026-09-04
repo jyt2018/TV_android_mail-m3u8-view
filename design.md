@@ -304,54 +304,37 @@
 ## 8. 工程结构
 
 ```
-app/src/main/java/com/tv/mailvod/
-├── ui/
-│   ├── ListActivity.kt        列表页主 Activity + 表头动态填充 + 全局焦点监听 + 设置/关于弹窗
-│   ├── SearchActivity.kt      搜索页界面壳(v0.6.4): 返回按钮 + 搜索框/按钮占位, 逻辑未实现
-│   ├── VideoAdapter.kt        适配器 + 方向键路由 + setHighlight + buildColumnLayoutParams()
-│   └── PlayerActivity.kt      ExoPlayer 播放
-├── mail/
-│   └── MailFetcher.kt         自写 SSLSocket IMAP 客户端 + MimeMessage 解析
-├── download/
-│   └── M3u8Downloader.kt      m3u8 解析 / 广告滤除 / 多线程分片下载 / AES-128 解密 / TS 拼接
-├── store/
-│   ├── LibraryStore.kt        library.json 读写 / 合并 / 去重 / 删除
-│   └── VideoItem.kt          数据模型 + 列值映射（含 type 字段）
-├── config/
-│   ├── Config.kt              配置模型（含 list_columns 动态列表）
-│   └── ConfigLoader.kt        assets/config.json → 私有目录副本（首次启动复制，已有则不覆盖; save() 供设置弹窗写入）
-└── App.kt                     Application 单例
-
-app/src/main/res/
-├── layout/
-│   ├── activity_list.xml      标题行(头像+标题+版本+刷新/设置/搜索) + 表头(编号+llHeaderFields+按钮占位) + RecyclerView
-│   ├── item_video.xml         编号(72dp) + llFields(weight=1) + 行内按钮
-│   ├── activity_search.xml    搜索页: 返回按钮 + 搜索框/搜索按钮 + 结果列表 + 空态
-│   ├── item_search.xml        搜索结果行: 标题(weight=1) + 摘要 + 想看按钮(84dp)
-│   └── dialog_settings.xml    设置弹窗: 邮箱账号 / 授权码两个输入框
-├── drawable/
-│   ├── ic_head.png            博美头像(mdpi/hdpi/xhdpi/xxhdpi 四密度, 透明背景, 由 _tmp/make_head_icon.py 生成)
-│   ├── bg_icon_focus.xml      头像聚焦黄框(3dp #FFD700 12dp 圆角描边)
-│   ├── bg_row_selector.xml    state_focused/state_selected → 黄框; default → 深灰背景
-│   ├── bg_btn_selector.xml    state_focused/state_pressed → 蓝色背景
-│   ├── bg_row_focused.xml     圆角4dp + 2dp黄色边框
-│   └── bg_row_normal.xml      圆角4dp + 深灰背景
-├── mipmap-*/ic_launcher.png   桌面图标(songsong.png 生成, _tmp/make_icons.py)
-└── drawable-xhdpi/ic_banner.png  TV 桌面 banner 640x360
-
-_tmp/
-├── make_icons.py              桌面图标/banner 生成（水印遮盖 + 多密度缩放）
-├── make_head_icon.py          标题头像生成（抠白底透明 + 多密度）
-├── send_body_mail.py          正文 JSON 测试邮件发送器（读同目录 library.json，自动追加 **********）
-├── send_test_mail.py          附件 JSON 测试邮件发送器
-├── imap_test.py               IMAP 连接 / 授权码测试脚本
-├── maven_fetch.py             Gradle 依赖预下载到本地 ~/.m2（绕过网络干扰）
-└── library.json               纯 JSON 数组，send_body_mail.py 读取并自动追加分隔符
+app/src/
+├── main/                          共用(TV/phone 两版本都打包, 只存一份)
+│   ├── java/com/tv/mailvod/
+│   │   ├── mail/MailFetcher.kt        IMAP 拉取 + 正文/附件 JSON 解析
+│   │   ├── download/M3u8Downloader.kt m3u8 解析/分片下载/AES-128/TS 拼接
+│   │   ├── download/MovieFiles.kt     movies/ 本地文件管理(下载集/删除/定位, 2026-09-04 抽取共用)
+│   │   ├── playback/VodPlayer.kt      ExoPlayer 核心(HLS/headers/断点续播/本地兜底, 2026-09-04 抽取共用)
+│   │   ├── store/                     LibraryStore / ProgressStore / VideoItem
+│   │   ├── config/                    Config / ConfigLoader
+│   │   ├── net/                       TlsCompat / UpdateChecker
+│   │   ├── ui/SetupActivity.kt        首次配置向导(纯代码 UI, 两版共用)
+│   │   └── App.kt                     Application 单例
+│   ├── res/                           mipmap 桌面图标 + colors + strings(公共)
+│   └── AndroidManifest.xml            权限 + 公共 application + FileProvider
+├── tv/                            TV 版专属(2026-09-04 flavor 化)
+│   ├── java/com/tv/mailvod/ui/        ListActivity(遥控器) / VideoAdapter(焦点) /
+│   │                                  PlayerActivity(按键壳) / SearchActivity
+│   ├── res/                           TV 布局/焦点 drawable/Theme.Leanback 主题/ic_head/ic_banner
+│   └── AndroidManifest.xml            leanback + banner + LEANBACK_LAUNCHER + REQUEST_INSTALL_PACKAGES
+└── phone/                         手机版专属(2026-09-04 新增)
+    ├── java/com/tv/mailvod/ui/        ListActivity(触屏) / VideoAdapter / PlayerActivity(触控条壳)
+    ├── res/                           触屏布局 + Theme.AppCompat 主题 + 措辞覆盖 strings
+    └── AndroidManifest.xml            仅 LAUNCHER, 触屏, 无 leanback
 ```
 
 技术栈：Kotlin + RecyclerView + ExoPlayer 2.18.5 + OkHttp 4.9.3 + kotlinx.serialization + android-mail 1.6.7。
 
-minSdk 21 / targetSdk 34 / compileSdk 34。版本号 0.6.4 / versionCode 29；APK 产物 `app/build/outputs/apk/debug/songmovie.apk`（debug 签名）。
+minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug 签名）：
+- `gradle assembleTvDebug` → `app/build/outputs/apk/tv/debug/app-tv-debug.apk`（com.tv.mailvod，0.7.2 / 36）
+- `gradle assemblePhoneDebug` → `app/build/outputs/apk/phone/debug/app-phone-debug.apk`（com.mailvod.phone，0.1.0 / 1）
+- leanback 依赖仅 `tvImplementation`（手机包不携带）；versionCode/Name 定义在 build.gradle.kts 的 productFlavors 内，各版本独立演进
 
 ---
 
@@ -400,4 +383,38 @@ minSdk 21 / targetSdk 34 / compileSdk 34。版本号 0.6.4 / versionCode 29；AP
 - `LibraryStore.delete` 删除条目的同时写入墓碑
 - `LibraryStore.merge` 在"新片编号 max+1"判断之前先查墓碑，命中则跳过（且不重复覆盖墓碑）
 - 已知代价：重装 app 后 files 目录清空，墓碑丢失 → 重装全量重建时被删片会回来（家用场景可接受；如不可接受再叠加"已处理邮件 UID 记录"方案，但会破坏全量重建能力，不推荐）
+
 - UI 可选增强：设置页显示墓碑清单，支持"恢复"单个条目（移出墓碑）
+
+---
+
+## 11. 手机版（phone flavor, v0.1.0）
+
+2026-09-04 从 TV 版派生。采用单模块 + productFlavors（`device` 维度）而非多模块：
+共用代码沉到 `src/main`（邮箱读取、媒体库、下载、播放核心、配置），版本差异只在 `src/tv` / `src/phone` 的 UI 壳与 manifest。
+
+### 11.1 与 TV 版的差异
+
+| 维度 | TV 版 | 手机版 |
+|---|---|---|
+| 包名 | com.tv.mailvod | com.mailvod.phone（可共存/并行调试） |
+| 版本 | 0.7.2 / 36 独立演进 | 0.1.0 / 1 独立演进 |
+| 入口 | LEANBACK_LAUNCHER + LAUNCHER | 仅 LAUNCHER |
+| 主题 | Theme.Leanback 系 | Theme.AppCompat.NoActionBar 系（同深色配色） |
+| 播放交互 | 遥控器 OK/左右键 | ExoPlayer 默认触控条，默认横屏(sensorLandscape) |
+| 列表交互 | D-pad 焦点高亮 + 表头表格 | 卡片行(标题/元信息/已下载标签) + 行内按钮 |
+| 自动更新 | 有(REQUEST_INSTALL_PACKAGES) | MVP 无 |
+| 搜索页 | 界面壳已实现 | MVP 无，后续补 |
+
+### 11.2 共用抽取（避免两份拷贝）
+
+- `MovieFiles`：movies 目录/已下载集合/本地文件定位与删除（原 TV ListActivity 私有方法上提）
+- `VodPlayer`：ExoPlayer 构建/HLS+headers/断点续播(10s 落盘)/本地损坏切在线兜底（原 TV PlayerActivity 主体上提；TV 只留按键处理，phone 只留生命周期转发）
+- `SetupActivity`：纯代码 UI 无布局依赖，直接沉到 main 两版共用；phone 版措辞差异（"遥控器 OK 键"→触屏文案）通过 flavor strings 覆盖实现
+
+### 11.3 phone 版后续可做
+
+- 搜索页（对齐 TV）
+- 自动更新（可复用 UpdateChecker，需补 REQUEST_INSTALL_PACKAGES 权限）
+- 竖屏海报式列表（当前为信息行式）
+- 真机验收：aapt 已验证包名/版本/图标/入口，触屏交互待用户真机实测

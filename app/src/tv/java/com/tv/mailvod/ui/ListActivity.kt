@@ -293,7 +293,9 @@ class ListActivity : ComponentActivity() {
                 lifecycleScope.launch {
                     App.instance.library.delete(item.id)
                     App.instance.progress.remove(ProgressStore.keyOf(item.title, item.episode))
-                    if (alsoFiles.isChecked) deleteLocalFiles(item.displayId)
+                    if (alsoFiles.isChecked) {
+                        com.tv.mailvod.download.MovieFiles.deleteLocalFiles(this@ListActivity, item.displayId)
+                    }
                     loadList()
                 }
             }
@@ -303,13 +305,7 @@ class ListActivity : ComponentActivity() {
         dlg.getButton(AlertDialog.BUTTON_POSITIVE).requestFocus()
     }
 
-    /** 删除条目对应的本地文件 (编号.ts/mp4 + 临时分片目录)。 */
-    private fun deleteLocalFiles(displayId: String) {
-        val dir = moviesDir()
-        dir.listFiles { f -> f.isFile && f.nameWithoutExtension == displayId }
-            ?.forEach { it.delete() }
-        File(dir, "${displayId}_tmp").deleteRecursively()
-    }
+    /** 删除条目对应的本地文件 (编号.ts/mp4 + 临时分片目录)。共用 MovieFiles。 */
 
     private fun startPlayer(item: VideoItem) {
         val intent = Intent(this, PlayerActivity::class.java).apply {
@@ -332,7 +328,7 @@ class ListActivity : ComponentActivity() {
             return
         }
 
-        val dir = moviesDir()
+        val dir = com.tv.mailvod.download.MovieFiles.dir(this)
         val view = layoutInflater.inflate(R.layout.dialog_download, null)
         val tvStatus = view.findViewById<TextView>(R.id.tvStatus)
         val tvDetail = view.findViewById<TextView>(R.id.tvDetail)
@@ -376,20 +372,15 @@ class ListActivity : ComponentActivity() {
         downloader?.start()
     }
 
-    /** 本地影片目录 (app 外部私有目录 movies/)。 */
-    private fun moviesDir(): File =
-        File(getExternalFilesDir(null), "movies").apply { mkdirs() }
+    /** 本地影片目录 (app 外部私有目录 movies/)。共用 MovieFiles。 */
 
     /** 已下载条目 (编号.ts 拼接产物) 的 displayId 集合。 */
     private fun downloadedIds(): Set<String> =
-        moviesDir().listFiles { f -> f.isFile && f.extension == "ts" }
-            ?.mapTo(HashSet()) { it.nameWithoutExtension } ?: emptySet()
+        com.tv.mailvod.download.MovieFiles.downloadedIds(this)
 
     /** 条目对应的本地播放文件 (编号.ts), 无则 null。 */
-    private fun localFileFor(item: VideoItem): File? {
-        val ts = File(moviesDir(), "${item.displayId}.ts")
-        return if (ts.exists() && ts.length() > 100 * 1024) ts else null
-    }
+    private fun localFileFor(item: VideoItem): File? =
+        com.tv.mailvod.download.MovieFiles.localFileFor(this, item)
 
     /** 播放已下载的本地文件 (ts), 失败自动切在线。 */
     private fun playLocal(file: File, item: VideoItem) {

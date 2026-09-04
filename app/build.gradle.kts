@@ -12,8 +12,24 @@ android {
         applicationId = "com.tv.mailvod"
         minSdk = 21
         targetSdk = 34
-        versionCode = 36
-        versionName = "0.7.2"
+        // versionCode/Name 按 flavor 分别定义, 见 productFlavors
+    }
+
+    // TV(机顶盒, 遥控器交互) 与 phone(手机, 触屏交互) 两个版本
+    flavorDimensions += "device"
+    productFlavors {
+        create("tv") {
+            dimension = "device"
+            applicationId = "com.tv.mailvod"
+            versionCode = 36
+            versionName = "0.7.2"
+        }
+        create("phone") {
+            dimension = "device"
+            applicationId = "com.mailvod.phone"
+            versionCode = 1
+            versionName = "0.1.0"
+        }
     }
 
     buildTypes {
@@ -58,7 +74,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.activity:activity-ktx:1.6.1")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
-    implementation("androidx.leanback:leanback:1.0.0")
+    add("tvImplementation", "androidx.leanback:leanback:1.0.0") // 仅 TV 包携带(主题 Theme.Leanback)
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 
     // Coroutines（低版本，兼容 minSdk 21）

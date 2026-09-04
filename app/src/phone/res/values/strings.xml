@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 手机版专属字符串: 覆盖 main 中含遥控器措辞的条目(其余共用 main/values/strings.xml) -->
+<resources>
+    <string name="setup_user_hint">163 邮箱账号</string>
+    <string name="setup_note">填好后点【保存】，片库自动从邮箱拉取。此信息仅保存在本机。</string>
+    <string name="empty_hint">暂无影片\n\n发一封标题带 [TV投递] 的邮件\n然后点【刷新】</string>
+    <string name="confirm_ok">确认删除？删除后不可恢复</string>
+</resources>
