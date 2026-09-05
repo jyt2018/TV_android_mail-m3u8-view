@@ -18,7 +18,7 @@ import com.tv.mailvod.R
 import com.tv.mailvod.databinding.ActivityListBinding
 import com.tv.mailvod.download.M3u8Downloader
 import com.tv.mailvod.download.MovieFiles
-import com.tv.mailvod.mail.MailFetcher
+import com.tv.mailvod.net.LibrarySync
 import com.tv.mailvod.store.ProgressStore
 import com.tv.mailvod.store.VideoItem
 import kotlinx.coroutines.launch
@@ -26,8 +26,7 @@ import java.io.File
 
 /**
  * 手机版列表主页面（触屏）。
- * - 首次安装(无邮箱配置) → 弹设置对话框
- * - 刷新按钮: IMAP 拉取 → 合并 → 刷新列表
+ * - 刷新按钮: Gitee 片库地址拉取 → 合并 → 刷新列表
  * - 行内: 在线播放 / 先下后播(进度对话框) / 删除(二次确认)
  * 播放核心、文件管理与 TV 版共用(VodPlayer/MovieFiles), 本类只做触屏交互。
  */
@@ -35,7 +34,7 @@ class ListActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityListBinding
     private lateinit var adapter: VideoAdapter
-    private val fetcher = MailFetcher()
+    private val sync = LibrarySync()
     private var downloader: M3u8Downloader? = null
     private val updater = com.tv.mailvod.net.AppUpdater(
         this, com.tv.mailvod.net.UpdateChecker.CHANNEL_PHONE)
@@ -63,12 +62,8 @@ class ListActivity : AppCompatActivity() {
         binding.btnRefresh.setOnClickListener { doRefresh() }
         binding.btnSettings.setOnClickListener { showSettingsDialog() }
 
-        // 首次安装(无配置) → 弹邮箱设置; 保存后自动刷新
-        if (App.instance.configLoader.config.mail.user.isBlank()) {
-            showSettingsDialog()
-        } else {
-            doRefresh() // 启动自动刷新一次
-        }
+        // 启动自动刷新一次 (零配置可用, 片库地址有内置默认值)
+        doRefresh()
     }
 
     override fun onResume() {
@@ -94,17 +89,13 @@ class ListActivity : AppCompatActivity() {
         binding.tvTitle.text = if (count > 0) "$base (共$count)" else base
     }
 
-    /** 拉取邮件并合并到 library.json。 */
+    /** 拉取 Gitee 片库并合并到 library.json。 */
     private fun doRefresh() {
-        if (App.instance.configLoader.config.mail.user.isBlank()) {
-            showSettingsDialog()
-            return
-        }
         Toast.makeText(this, R.string.fetching, Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
             val cfg = App.instance.configLoader.reload()
             val result = runCatching {
-                val items = fetcher.fetch(cfg)
+                val items = sync.fetch(cfg.libraryUrl)
                 App.instance.library.merge(items)
             }
             result.onSuccess { added ->
@@ -119,7 +110,7 @@ class ListActivity : AppCompatActivity() {
         }
     }
 
-    /** 设置对话框: 输入邮箱账号与授权码, 保存后刷新片库。 */
+    /** 设置对话框: 输入 Gitee 片库地址(内置默认值), 保存后刷新片库。 */
     private fun showSettingsDialog() {
         val cfg = App.instance.configLoader.config
         val dp = resources.displayMetrics.density
@@ -132,34 +123,24 @@ class ListActivity : AppCompatActivity() {
             setTextColor(getColor(R.color.text_secondary))
             textSize = 13f
         }
-        val etUser = EditText(this).apply {
-            hint = "example@163.com"
+        val etUrl = EditText(this).apply {
+            hint = "https://gitee.com/..."
             setSingleLine(true)
-            setText(cfg.mail.user)
+            setText(cfg.libraryUrl)
         }
-        val etAuth = EditText(this).apply {
-            hint = "16 位授权码"
-            setSingleLine(true)
-            setText(cfg.mail.authCode)
-        }
-        layout.addView(label(getString(R.string.settings_user_hint)))
-        layout.addView(etUser)
-        layout.addView(label(getString(R.string.settings_auth_hint)))
-        layout.addView(etAuth)
+        layout.addView(label(getString(R.string.settings_url_hint)))
+        layout.addView(etUrl)
 
         AlertDialog.Builder(this)
             .setTitle(R.string.settings_title)
             .setView(layout)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                val user = etUser.text.toString().trim()
-                val auth = etAuth.text.toString().trim()
-                if (user.isEmpty() || auth.isEmpty()) {
-                    Toast.makeText(this, R.string.setup_missing, Toast.LENGTH_LONG).show()
+                val url = etUrl.text.toString().trim()
+                if (url.isEmpty()) {
+                    Toast.makeText(this, R.string.settings_url_missing, Toast.LENGTH_LONG).show()
                     return@setPositiveButton
                 }
-                App.instance.configLoader.save(
-                    cfg.copy(mail = cfg.mail.copy(user = user, authCode = auth))
-                )
+                App.instance.configLoader.save(cfg.copy(libraryUrl = url))
                 Toast.makeText(this, R.string.settings_saved, Toast.LENGTH_SHORT).show()
                 doRefresh()
             }

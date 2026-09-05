@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * library.json 中的一个条目。对应一封 [TV投递] 邮件。
+ * library.json 中的一个条目。对应片源清单(library.json from Gitee)中的一个对象。
  * 唯一键 = title + episode（episode 缺省按 0）。
  */
 @Serializable

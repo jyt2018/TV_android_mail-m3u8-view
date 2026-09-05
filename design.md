@@ -1,15 +1,18 @@
-# MailM3U8 TV 设计文档（v0.7.4）
+# MailM3U8 TV 设计文档（v0.7.5）
 
-> TV 端「邮箱投递影片 → 合并到本地 JSON → 列表选择 → 播放 m3u8」+ 手机版（phone flavor）
-> 状态：已实现（收片通、双端自动更新已上线、UI 打磨中）
+> TV 端「Gitee 片源清单 → 合并到本地 JSON → 列表选择 → 播放 m3u8」+ 手机版（phone flavor）
+> 状态：已实现（Gitee 收片、双端自动更新已上线、UI 打磨中）
 > 日期：2026-09-05
+
+> **v0.7.5 重大变更**：全面移除邮箱(IMAP)收片通道，改为 Gitee 仓库 `library.json` 片源清单（一次 HTTPS GET，零配置可用）。
+> 历史邮件方案的全部设计/坑记录保留在 §2/§7 作留底。
 
 ---
 
 ## 1. 目标与边界
 
 ### 1.1 核心目标
-1. 启动应用 → 拉取指定邮箱邮件 → 解析 JSON → 合并到本地 `library.json`。
+1. 启动应用 → 从 Gitee 片库地址（默认内置）拉取 `library.json` → 解析 JSON → 合并到本地 `library.json`。
 2. 单页列表展示，遥控器上下选行、右移到播放键、OK 即播，无详情页。
 3. 播放使用 ExoPlayer 2.18.5（TV 设备低版本友好）。
 
@@ -17,44 +20,18 @@
 - 不用 Room 数据库，仅一个 JSON 数组文件 `library.json`。
 - 不做后台轮询 / 开机自启：启动时拉取一次 + 列表页「刷新」键手动拉取。
 - 不做详情页 / 海报 / 多集菜单。
-- 不做 SMTP 回执。
+- ~~不做 SMTP 回执~~（邮箱通道已于 0.7.5 整体移除）。
+- 播放进度云同步不做（本地 files/progress.json 已够用，讨论结论 2026-09-05）。
 - （v0.7.1 已补充实现：断点续播记忆，见 §11.2）
 
 ---
 
-## 2. 投递 JSON 协议
+## 2. 片源清单协议（Gitee library.json）
 
-### 2.1 邮件主题
+片源以 JSON 数组放在 Gitee 公开仓库 `unixsam/mailvod-release` 的 `library.json`（与 version.json/APK 同仓库）。应用按 config.json 的 `library_url`（raw 直链，默认指向该文件）拉取。
 
-固定为 `m3u8_view`（可在 config.json 改 `mail.subject_prefix`）。
-
-### 2.2 投递方式（两种都支持）
-
-**方式 A：正文 JSON + 分隔符（推荐，简单）**
-
-正文是纯 JSON 数组，最后追加 `**********` 作为分隔符（分隔符之前的内容就是 JSON）。
-
-```json
-[
-  {
-    "title": "启示录",
-    "year": 2006,
-    "country": "美国",
-    "director": "梅尔吉普森",
-    "type": "动作",
-    "url": "https://v.gsuus.com/play/NbWVpgay/index.m3u8"
-  }
-]
-**********
-```
-
-**方式 B：`.json` 附件（备选，最稳）**
-
-邮件带一个 `.json` 后缀的附件（Content-Type: `application/json`），附件内容就是 JSON 数组。JavaMail 自动解码 base64/GBK/QP，直接解析附件。
-
-**解析优先级**：附件 > 分隔符 `**********` 之前 > 直接以 `[` 或 `{` 开头 > 正则 fallback。
-
-> 正文模式下，即使没有分隔符，只要正文是纯 JSON（以 `[` 或 `{` 开头），也能被正则 `\[...\]` 或 `\{...\}` fallback 捕获。分隔符的作用是**从可能包含额外文字的正文里精确定位 JSON 块**。
+> 历史方案（0.7.4 及以前）：邮件主题 `m3u8_view` + 正文 JSON（`**********` 分隔符）或 `.json` 附件，
+> 自写 IMAP 单连接 + MIME 多级解码。0.7.5 起移除，完整设计见 git 历史与 §7 坑表。
 
 ### 2.3 单条 JSON 字段
 
@@ -81,27 +58,21 @@
 | `headers` | 否 | 防盗链请求头 |
 
 **唯一键（去重覆盖）**：`title + episode`（episode 缺省按 0 处理）。
-重复投递同一 key → 覆盖旧条目（更新 url 或元信息），**保留原编号和入库时间**。
+片源清单中重复 key 或与本地重复 → 覆盖旧条目（更新 url 或元信息），**保留原编号和入库时间**。
+
+**维护方式**：网页端 Gitee 直接编辑 `library.json`，或本地编辑后用 `_tmp/push_library.py` 上传（自动从电视设备读取现有片库转投递格式）。raw 直链有分钟级 CDN 缓存，改完稍等再刷新。
 
 ---
 
 ## 3. 配置文件 config.json
 
 位置：应用私有目录 `/data/data/<包名>/files/config.json`。
-**v0.7.0 起 APK 不再打包 assets/config.json**（防逆向泄露授权码）：首次启动无配置时跳转 SetupActivity，由用户输入邮箱与授权码后写入。已有文件不会被覆盖。输入框提示为通用示例 `example@163.com`，不含真实账号。
+**零配置可用**：文件不存在或损坏时全部走默认值；「设置」按钮可改 `library_url`。旧版本遗留的 `mail` 段会被 ignoreUnknownKeys 忽略，不影响读取。
 
 ```jsonc
 {
-  "mail": {
-    "host": "imap.163.com",        // IMAP 服务器地址
-    "port": 993,                   // IMAP 端口 (SSL)
-    "smtp_host": "smtp.163.com",   // SMTP 服务器 (备用)
-    "smtp_port": 465,              // SMTP 端口 (SSL)
-    "user": "you@163.com",         // 邮箱账号 (完整地址)
-    "auth_code": "你的163授权码",   // 不是登录密码,是邮箱设置里生成的客户端授权码
-    "subject_prefix": "m3u8_view", // 只拉取主题以这个前缀开头的邮件
-    "folder": "INBOX"              // 要扫描的 IMAP 文件夹,默认收件箱
-  },
+  "library_url": "https://gitee.com/unixsam/mailvod-release/raw/master/library.json",
+                                   // 片源清单地址, 设置页可改
   "list_columns": ["title", "country", "type", "year", "director"],
                                    // 列表每行显示哪些字段,顺序即显示顺序
                                    // 可选值: title, country, type, year, director, actors, episode
@@ -248,37 +219,25 @@
 
 ---
 
-## 6. 收片流程
+## 6. 片库同步流程
 
 ```
 [启动/刷新]
    │
-   1) 读 config.json（含 host/port/user/auth_code/subject_prefix/folder）
+   1) 读 config.json（library_url, 默认 Gitee raw 直链）
    │
-   2) IMAP 单连接（自写 SSLSocket，不用 JavaMail 的 Store/Folder）
-      LOGIN user + auth_code
-      ID ("name" "mailvod")          ← 163 风控要求
-      SELECT INBOX                    ← 同一条连接
-      SEARCH ALL                      ← 全量，不看已读状态（实现幂等）
-      对每封 MATCH 执行 FETCH RFC822  ← 完整 raw MIME 字节
-      （READ_ONLY，不修改邮箱任何状态）
+   2) LibrarySync.fetch: 一次 HTTPS GET（15s 超时, TlsCompat 全局证书）
    │
-   3) MimeMessage 解析：强制 ByteArrayDataSource + MimeMultipart
-      - 优先找 application/json 附件
-      - 没附件时取 text/plain 正文
+   3) parse: 数组/单对象直接 parse, 杂文包裹时正则回退找 JSON 块;
+      逐项校验 title/url 非空白, headers 过滤空白值
    │
-   4) parseVideos:
-      - 有 ********** 分隔符 → 切分取前面
-      - 直接以 [ 或 { 开头 → 直接 parse
-      - 否则正则 fallback 找 JSON 块
-      - 逐项校验 title/url 非空
+   4) LibraryStore.merge: title+episode 匹配 → 覆盖 / 新增 → 落盘
    │
-   5) LibraryStore.merge: title+episode 匹配 → 覆盖 / 新增 → 落盘
-   │
-   6) 刷新列表页显示，Toast "拉取完成，新增 X 条"
+   5) 刷新列表页显示, Toast "拉取完成, 新增 X 条"
 ```
 
-**幂等性**：邮箱不标记已读（READ_ONLY），每次刷新全量拉取 → 本地 JSON 做去重合并。重装 App 后刷新一次即可从邮箱重建整个库。
+**幂等性**：远端清单是只读输入, 每次刷新全量拉取 → 本地 JSON 去重合并。重装 App 后刷新一次即可重建整个库。
+**离线可用**：拉取失败仅 Toast 提示, 本地 library.json 不受影响。
 
 ---
 
@@ -310,21 +269,21 @@
 app/src/
 ├── main/                          共用(TV/phone 两版本都打包, 只存一份)
 │   ├── java/com/tv/mailvod/
-│   │   ├── mail/MailFetcher.kt        IMAP 拉取 + 正文/附件 JSON 解析
+│   │   ├── net/LibrarySync.kt         Gitee 片库地址 GET + 投递 JSON 解析(0.7.5 取代 mail/)
 │   │   ├── download/M3u8Downloader.kt m3u8 解析/分片下载/AES-128/TS 拼接
 │   │   ├── download/MovieFiles.kt     movies/ 本地文件管理(下载集/删除/定位, 2026-09-04 抽取共用)
 │   │   ├── playback/VodPlayer.kt      ExoPlayer 核心(HLS/headers/断点续播/本地兜底, 2026-09-04 抽取共用)
 │   │   ├── store/                     LibraryStore / ProgressStore / VideoItem
-│   │   ├── config/                    Config / ConfigLoader
+│   │   ├── config/                    Config(library_url 默认值) / ConfigLoader
 │   │   ├── net/                       TlsCompat / UpdateChecker(双通道版本清单) / AppUpdater(更新流程)
-│   │   ├── ui/SetupActivity.kt        首次配置向导(纯代码 UI, 两版共用)
 │   │   └── App.kt                     Application 单例
 │   ├── res/                           mipmap 桌面图标 + colors + strings(公共)
+│   ├── assets/certs/                  ISRG Root X1/X2(TLS 兼容) + config.example.json(仅参考)
 │   └── AndroidManifest.xml            权限 + 公共 application + FileProvider
 ├── tv/                            TV 版专属(2026-09-04 flavor 化)
 │   ├── java/com/tv/mailvod/ui/        ListActivity(遥控器) / VideoAdapter(焦点) /
 │   │                                  PlayerActivity(按键壳) / SearchActivity
-│   ├── res/                           TV 布局/焦点 drawable/Theme.Leanback 主题/ic_head/ic_banner
+│   ├── res/                           TV 布局/焦点 drawable/Theme.Leanback 主题/ic_head/ic_banner/dialog_settings(片库地址)
 │   └── AndroidManifest.xml            leanback + banner + LEANBACK_LAUNCHER + REQUEST_INSTALL_PACKAGES
 └── phone/                         手机版专属(2026-09-04 新增)
     ├── java/com/tv/mailvod/ui/        ListActivity(触屏) / VideoAdapter / PlayerActivity(触控条壳)
@@ -332,11 +291,11 @@ app/src/
     └── AndroidManifest.xml            仅 LAUNCHER, 触屏, 无 leanback
 ```
 
-技术栈：Kotlin + RecyclerView + ExoPlayer 2.18.5 + OkHttp 4.9.3 + kotlinx.serialization + android-mail 1.6.7。
+技术栈：Kotlin + RecyclerView + ExoPlayer 2.18.5 + OkHttp 4.9.3 + kotlinx.serialization（0.7.5 移除 android-mail）。
 
 minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug 签名）：
-- `gradle assembleTvDebug` → `app/build/outputs/apk/tv/debug/app-tv-debug.apk`（com.tv.mailvod，0.7.4 / 38）
-- `gradle assemblePhoneDebug` → `app/build/outputs/apk/phone/debug/app-phone-debug.apk`（com.mailvod.phone，0.1.2 / 3）
+- `gradle assembleTvDebug` → `app/build/outputs/apk/tv/debug/app-tv-debug.apk`（com.tv.mailvod，0.7.5 / 39）
+- `gradle assemblePhoneDebug` → `app/build/outputs/apk/phone/debug/app-phone-debug.apk`（com.mailvod.phone，0.1.3 / 4）
 - leanback 依赖仅 `tvImplementation`（手机包不携带）；versionCode/Name 定义在 build.gradle.kts 的 productFlavors 内，各版本独立演进
 
 ---
@@ -345,25 +304,23 @@ minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug �
 
 | 场景 | 预期 |
 |---|---|
-| 发一封 `m3u8_view` + 正文 JSON（带 `**********` 分隔符） | 刷新后列表顶部出现新行，标题/国家/类型/年份/导演正确显示，播放 OK |
-| 发一封 `m3u8_view` + `.json` 附件 | 刷新后同上（附件路径） |
-| 发一封 multipart 正文（163 网页端） | 刷新后正常解析（强制 MimeMultipart 修复生效） |
-| 电视剧每集一封 | 列表顶部多行，各自行播放对应集 |
-| 同 title+episode 重发（改了 url） | 覆盖 url，**保留原编号与原位置**，列表不重复 |
-| 非法 JSON / 缺 title 或 url | 跳过，日志输出原因，列表无该行 |
+| 片源清单 library.json 加一条新片（Gitee 网页端或 push_library.py） | 刷新后列表顶部出现新行，标题/国家/类型/年份/导演正确显示，播放 OK |
+| 同 title+episode 改 url 重传清单 | 覆盖 url，**保留原编号与原位置**，列表不重复 |
+| 清单里缺 title 或 url 的条目 | 跳过，日志输出原因，列表无该行 |
+| 断网时刷新 | Toast 拉取失败，本地 library.json 与列表不变 |
+| 重装 App 后刷新 | 从 Gitee 片库地址全量重建 library.json |
 | 选中行显示橙色外框 + 深灰背景 | OK |
 | 按钮聚焦时行黄框保留 | OK（isSelected=true 不随 focus 丢失） |
 | 焦点从第一行按 ↑ 跳到刷新按钮，旧行黄框消失 | OK（全局焦点监听 setHighlight(rv, -1)） |
 | 遥控器在某行按右 → 焦点移到播放键；再右 → 删除键；左 → 回行 | OK（方向键强制路由） |
-| 删除后再发新片 | 分配下一个新编号，不复用旧编号 |
-| 重装 App 后刷新 | 全量拉取邮箱，重建 library.json（READ_ONLY 幂等） |
+| 删除后再更新清单 | 分配下一个新编号，不复用旧编号 |
 | 按遥控器「菜单」键 | 触发刷新 |
 | 表头表体列对齐 | OK（共用 buildColumnLayoutParams + 按钮占位） |
 | 按钮尺寸缩小 | OK（minWidth=0dp + padding 10/4） |
 | 标题行显示 [头像] 松松看片 (共x) v 0.6.4 + 刷新🔄/设置⚙️/搜索🔎 三等宽按钮 | OK（v0.6.4） |
 | 头像透明背景 PNG；遥控器焦点移上出现黄框 | OK（bg_icon_focus 3dp 黄描边） |
 | OK 点头像 → 关于弹窗（版本/开发者/操作说明），OK 或返回关闭 | OK |
-| 设置⚙️ → 弹窗预填账号/授权码，修改确定后 config.json 更新 | OK（ConfigLoader.save） |
+| 设置⚙️ → 弹窗预填片库地址（默认 Gitee 直链），修改确定后 config.json 更新 | OK（ConfigLoader.save） |
 | 搜索🔎 → 进入搜索页；返回按钮 / 遥控器返回键回片库页 | OK（搜索逻辑未实现，点搜索提示开发中） |
 
 ---
@@ -373,20 +330,18 @@ minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug �
 - [ ] 自定义按钮聚焦 selector（按钮选中时也有橙色边框，目前是蓝色背景）
 - [ ] 空列表时给 btnRefresh 加下一行焦点，让遥控器首次按 OK 就能刷新
 - [ ] 开机自启 + 首次启动自动刷新
-- [ ] 正文模式下不强制分隔符也行（已 fallback 正则捕获），但分隔符更稳
 - [ ] headers 白名单（仅允许 UA/Referer/Origin/Cookie）
 - [ ] ConfigLoader 支持通过 adb 覆盖 config.json（目前需要卸载重装才能更新）
 
-### 10.1 删除条目被邮件刷新回刷（2026-09-04 讨论定方案，暂不实施）
+### 10.1 删除条目被片源清单刷新回刷（2026-09-04 讨论定方案，暂不实施）
 
-**问题**：电视端删除某电影只操作本地 library.json；邮箱里对应邮件仍在，下次刷新（启动自动刷新/菜单键）重新解析后，本地查无此片 → 按"新片"插回列表。
+**问题**：电视端删除某电影只操作本地 library.json；Gitee 片源清单里对应条目仍在，下次刷新重新解析后，本地查无此片 → 按"新片"插回列表。
 
 **已定方案（墓碑清单）**：
 - library.json 增加 `deleted` 数组，存被删条目的 key（title+episode，或含 url 增强唯一性）
 - `LibraryStore.delete` 删除条目的同时写入墓碑
 - `LibraryStore.merge` 在"新片编号 max+1"判断之前先查墓碑，命中则跳过（且不重复覆盖墓碑）
-- 已知代价：重装 app 后 files 目录清空，墓碑丢失 → 重装全量重建时被删片会回来（家用场景可接受；如不可接受再叠加"已处理邮件 UID 记录"方案，但会破坏全量重建能力，不推荐）
-
+- 已知代价：重装 app 后 files 目录清空，墓碑丢失 → 重装全量重建时被删片会回来（家用场景可接受）
 - UI 可选增强：设置页显示墓碑清单，支持"恢复"单个条目（移出墓碑）
 
 ---
@@ -394,18 +349,19 @@ minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug �
 ## 11. 手机版（phone flavor, v0.1.0）
 
 2026-09-04 从 TV 版派生。采用单模块 + productFlavors（`device` 维度）而非多模块：
-共用代码沉到 `src/main`（邮箱读取、媒体库、下载、播放核心、配置），版本差异只在 `src/tv` / `src/phone` 的 UI 壳与 manifest。
+共用代码沉到 `src/main`（片库同步、媒体库、下载、播放核心、配置），版本差异只在 `src/tv` / `src/phone` 的 UI 壳与 manifest。
 
 ### 11.1 与 TV 版的差异
 
 | 维度 | TV 版 | 手机版 |
 |---|---|---|
 | 包名 | com.tv.mailvod | com.mailvod.phone（可共存/并行调试） |
-| 版本 | 0.7.4 / 38 独立演进 | 0.1.2 / 3 独立演进 |
+| 版本 | 0.7.5 / 39 独立演进 | 0.1.3 / 4 独立演进 |
 | 入口 | LEANBACK_LAUNCHER + LAUNCHER | 仅 LAUNCHER |
 | 主题 | Theme.Leanback 系 | Theme.AppCompat.NoActionBar 系（同深色配色） |
 | 播放交互 | 遥控器 OK/左右键, 返回=二次确认退出(0.7.4 防误触) | ExoPlayer 默认触控条, 默认横屏(sensorLandscape), 返回直接退出 |
 | 列表交互 | D-pad 焦点高亮 + 表头表格 | 卡片行(标题/元信息/已下载标签) + 行内按钮 |
+| 设置弹窗 | dialog_settings 布局(片库地址) | 代码构建布局(片库地址) |
 | 自动更新 | 有(REQUEST_INSTALL_PACKAGES) | 有(0.1.1 起, 同权限) |
 | 搜索页 | 界面壳已实现 | MVP 无，后续补 |
 
@@ -413,7 +369,7 @@ minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug �
 
 - `MovieFiles`：movies 目录/已下载集合/本地文件定位与删除（原 TV ListActivity 私有方法上提）
 - `VodPlayer`：ExoPlayer 构建/HLS+headers/断点续播(10s 落盘)/本地损坏切在线兜底（原 TV PlayerActivity 主体上提；TV 只留按键处理，phone 只留生命周期转发）
-- `SetupActivity`：纯代码 UI 无布局依赖，直接沉到 main 两版共用；phone 版措辞差异（"遥控器 OK 键"→触屏文案）通过 flavor strings 覆盖实现
+- `LibrarySync`：Gitee 片库拉取与解析（0.7.5 取代原 MailFetcher+SetupActivity 链路）
 
 ### 11.3 自动更新（Gitee 双通道, 2026-09-05）
 

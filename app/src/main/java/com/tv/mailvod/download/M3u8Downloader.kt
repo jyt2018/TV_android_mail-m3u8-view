@@ -23,7 +23,7 @@ import javax.crypto.spec.SecretKeySpec
  * 分片下载 8 线程 (盒子性能友好)。
  *
  * @param m3u8Url  播放列表 URL
- * @param headers  防盗链 headers (来自邮件条目, 可为空 map)
+ * @param headers  防盗链 headers (来自片源条目, 可为空 map)
  * @param workDir  临时分片目录 (下载完成后自动清理)
  * @param outFile  最终输出文件 (编号.ts; 扩展名由调用方给定, 实际写出 .ts)
  * @param listener 进度/结果回调 (全部在工作线程回调, UI 层需自行切主线程)

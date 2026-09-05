@@ -21,14 +21,14 @@ android {
         create("tv") {
             dimension = "device"
             applicationId = "com.tv.mailvod"
-            versionCode = 38
-            versionName = "0.7.4"
+            versionCode = 39
+            versionName = "0.7.5"
         }
         create("phone") {
             dimension = "device"
             applicationId = "com.mailvod.phone"
-            versionCode = 3
-            versionName = "0.1.2"
+            versionCode = 4
+            versionName = "0.1.3"
         }
     }
 
@@ -51,13 +51,10 @@ android {
         resources {
             excludes += setOf(
                 "META-INF/NOTICE.txt",
-                "META-INF/NOTICE.md",
                 "META-INF/NOTICE",
                 "META-INF/LICENSE.txt",
-                "META-INF/LICENSE.md",
                 "META-INF/LICENSE",
                 "META-INF/DEPENDENCIES",
-                "META-INF/mailcap",
                 "META-INF/*.kotlin_module"
             )
         }
@@ -90,10 +87,6 @@ dependencies {
 
     // OkHttp（低版本稳定）
     implementation("com.squareup.okhttp3:okhttp:4.9.3")
-
-    // JavaMail for Android (IMAP)
-    implementation("com.sun.mail:android-mail:1.6.7")
-    implementation("com.sun.mail:android-activation:1.6.7")
 
     // Lifecycle（与 core-ktx 1.9.0 配套）
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.5.1")

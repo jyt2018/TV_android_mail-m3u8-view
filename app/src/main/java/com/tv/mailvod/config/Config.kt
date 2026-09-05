@@ -5,27 +5,17 @@ import kotlinx.serialization.Serializable
 
 /**
  * config.json 的内存模型。
- * 文件位于应用私有目录 files/config.json，首次启动从 assets 复制。
+ * 文件位于应用私有目录 files/config.json；旧版本的 mail 段因 ignoreUnknownKeys 会被忽略。
  */
 @Serializable
 data class Config(
-    val mail: Mail = Mail(),
+    /** 片库地址(Gitee 仓库 library.json 的 raw 直链), 设置页可改。 */
+    @SerialName("library_url")
+    val libraryUrl: String = "https://gitee.com/unixsam/mailvod-release/raw/master/library.json",
     @SerialName("list_columns")
     val listColumns: List<String> = listOf("title", "episode", "year", "director"),
     val player: Player = Player()
 ) {
-    @Serializable
-    data class Mail(
-        val host: String = "imap.163.com",
-        val port: Int = 993,
-        val user: String = "",
-        @SerialName("auth_code")
-        val authCode: String = "",
-        @SerialName("subject_prefix")
-        val subjectPrefix: String = "m3u8_view",
-        val folder: String = "INBOX"
-    )
-
     @Serializable
     data class Player(
         @SerialName("auto_next")

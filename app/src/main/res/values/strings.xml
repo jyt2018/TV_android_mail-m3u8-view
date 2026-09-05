@@ -17,9 +17,9 @@
     <string name="action_settings">设置</string>
     <string name="action_search">搜索</string>
     <string name="action_back">← 返回</string>
-    <string name="settings_title">邮箱设置</string>
-    <string name="settings_user_hint">邮箱账号</string>
-    <string name="settings_auth_hint">邮箱授权码</string>
+    <string name="settings_title">片库设置</string>
+    <string name="settings_url_hint">Gitee 片库地址</string>
+    <string name="settings_url_missing">片库地址不能为空</string>
     <string name="settings_saved">设置已保存</string>
     <string name="search_hint">输入片名关键词</string>
     <string name="search_btn">搜索</string>
@@ -28,21 +28,14 @@
     <string name="want_watch">想看</string>
     <string name="about_title">关于 松松看片</string>
     <string name="about_developer">开发者：jyt2018</string>
-    <string name="about_usage">操作说明：\n1. 上下键选片，OK 键播放在线视频\n2. 行内左右移动可选【先下后播】【删除】\n3. 遥控器菜单键 = 刷新片库\n4. 设置：配置邮箱账号与授权码\n5. 搜索：全网找片（开发中）\n6. 投递：发一封标题带 m3u8_view 的邮件，正文为 [{\"title\":…,\"url\":…}] JSON 数组，按刷新即入库</string>
-    <string name="empty_hint">暂无影片。投递一封标题带 m3u8_view 的邮件后按刷新键。</string>
+    <string name="about_usage">操作说明：\n1. 上下键选片，OK 键播放在线视频\n2. 行内左右移动可选【先下后播】【删除】\n3. 遥控器菜单键 = 刷新片库\n4. 设置：配置 Gitee 片库地址（默认已填好）\n5. 搜索：全网找片（开发中）\n6. 片源：Gitee 仓库 library.json 片源清单，按刷新即入库</string>
+    <string name="empty_hint">暂无影片。按刷新键从片库地址拉取。</string>
     <string name="confirm_delete">已看过？删除该条目</string>
     <string name="confirm_ok">再按 OK 确认删除 / 返回取消</string>
-    <string name="fetching">正在拉取邮件…</string>
+    <string name="fetching">正在拉取片库…</string>
     <string name="fetch_done">拉取完成，新增 %1$d 条</string>
     <string name="fetch_fail">拉取失败：%1$s</string>
     <string name="play_error">线路不可用：%1$s</string>
-    <string name="setup_title">首次配置 · 邮箱收片</string>
-    <string name="setup_user_hint">163 邮箱账号（遥控器 OK 键唤出键盘）</string>
-    <string name="setup_auth_hint">163 授权码（邮箱设置 → POP3/IMAP/SMTP 获取）</string>
-    <string name="setup_note">填好后按【保存】，片库自动从邮箱拉取。此信息仅保存在本机。</string>
-    <string name="setup_save">保存</string>
-    <string name="setup_missing">账号和授权码都不能为空</string>
-    <string name="setup_done">配置已保存，正在进入片库…</string>
     <string name="update_found">发现新版本</string>
     <string name="update_msg">检测到新版本，是否立即安装？</string>
     <string name="update_install">立即安装</string>

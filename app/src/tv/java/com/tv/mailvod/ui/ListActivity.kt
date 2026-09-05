@@ -17,7 +17,7 @@ import com.tv.mailvod.App
 import com.tv.mailvod.R
 import com.tv.mailvod.databinding.ActivityListBinding
 import com.tv.mailvod.download.M3u8Downloader
-import com.tv.mailvod.mail.MailFetcher
+import com.tv.mailvod.net.LibrarySync
 import com.tv.mailvod.store.ProgressStore
 import com.tv.mailvod.store.VideoItem
 import kotlinx.coroutines.launch
@@ -26,7 +26,7 @@ import java.io.File
 /**
  * 列表页（唯一主页面）。
  * - onResume 加载 library.json 并显示
- * - 刷新键：IMAP 拉取 → 合并 → 刷新列表
+ * - 刷新键：Gitee 片库地址拉取 → 合并 → 刷新列表
  * - 行播放键：跳转 PlayerActivity（传 url + headers）
  * - 行删除键：系统 AlertDialog 二次确认 → 删除并刷新
  *
@@ -36,19 +36,13 @@ class ListActivity : ComponentActivity() {
 
     private lateinit var binding: ActivityListBinding
     private lateinit var adapter: VideoAdapter
-    private val fetcher = MailFetcher()
+    private val sync = LibrarySync()
     private var downloader: M3u8Downloader? = null
     private val updater = com.tv.mailvod.net.AppUpdater(this, com.tv.mailvod.net.UpdateChecker.CHANNEL_TV)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         App.instance.configLoader.ensureLoaded()
-        // 首次安装(无配置) → 配置向导, 输完回来自动重走 onCreate
-        if (App.instance.configLoader.config.mail.user.isBlank()) {
-            startActivity(android.content.Intent(this, SetupActivity::class.java))
-            finish()
-            return
-        }
         binding = ActivityListBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.tvTitle.text = getString(R.string.app_name)
@@ -112,7 +106,7 @@ class ListActivity : ComponentActivity() {
         binding.ivIcon.setOnClickListener { showAboutDialog() }
 
         // 启动后自动刷新一次 (仅 onCreate, 从播放页返回的 onResume 不重复拉取)
-        if (App.instance.configLoader.config.mail.user.isNotBlank()) doRefresh()
+        doRefresh()
     }
 
     /** 弹"发现新版本"对话框逻辑在共用 AppUpdater; 此处仅保留调用入口。 */
@@ -120,9 +114,6 @@ class ListActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         loadList()
-        if (App.instance.configLoader.config.mail.user.isBlank()) {
-            startActivity(Intent(this, SetupActivity::class.java))
-        }
         // 自动检查更新(TV 上按返回退出进程常驻, onCreate 不再重跑 → 挪到 onResume + 30 分钟节流)
         if (updater.shouldAutoCheck()) updater.check(manual = false)
     }
@@ -152,13 +143,13 @@ class ListActivity : ComponentActivity() {
         binding.tvTitle.text = if (count > 0) "$base (共$count)" else base
     }
 
-    /** 拉取邮件并合并到 library.json。 */
+    /** 拉取 Gitee 片库并合并到 library.json。 */
     private fun doRefresh() {
         Toast.makeText(this, R.string.fetching, Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
             val cfg = App.instance.configLoader.reload()
             val result = runCatching {
-                val items = fetcher.fetch(cfg)
+                val items = sync.fetch(cfg.libraryUrl)
                 val added = App.instance.library.merge(items)
                 added
             }
@@ -189,23 +180,22 @@ class ListActivity : ComponentActivity() {
             .show()
     }
 
-    /** 设置弹窗: 输入邮箱账号与授权码, 确定后写入 config.json。 */
+    /** 设置弹窗: 输入 Gitee 片库地址(默认值内置), 确定后写入 config.json。 */
     private fun showSettingsDialog() {
         val cfg = App.instance.configLoader.config
         val view = layoutInflater.inflate(R.layout.dialog_settings, null)
-        val etUser = view.findViewById<android.widget.EditText>(R.id.etUser)
-        val etAuth = view.findViewById<android.widget.EditText>(R.id.etAuth)
-        etUser.setText(cfg.mail.user)
-        etAuth.setText(cfg.mail.authCode)
+        val etUrl = view.findViewById<android.widget.EditText>(R.id.etUrl)
+        etUrl.setText(cfg.libraryUrl)
         AlertDialog.Builder(this)
             .setTitle(R.string.settings_title)
             .setView(view)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                val user = etUser.text.toString().trim()
-                val auth = etAuth.text.toString().trim()
-                App.instance.configLoader.save(
-                    cfg.copy(mail = cfg.mail.copy(user = user, authCode = auth))
-                )
+                val url = etUrl.text.toString().trim()
+                if (url.isEmpty()) {
+                    Toast.makeText(this, R.string.settings_url_missing, Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                App.instance.configLoader.save(cfg.copy(libraryUrl = url))
                 Toast.makeText(this, R.string.settings_saved, Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton(android.R.string.cancel, null)

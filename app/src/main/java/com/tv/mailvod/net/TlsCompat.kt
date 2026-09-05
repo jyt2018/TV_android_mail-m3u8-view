@@ -19,8 +19,7 @@ import javax.net.ssl.X509TrustManager
  *
  * 方案: 打包 ISRG Root X1/X2 进 assets, 构造 [CompositeTrustManager]
  *      (系统信任库 + ISRG), 设为 HttpsURLConnection 与 JVM 默认。
- *      影响面: DefaultHttpDataSource(ExoPlayer) / HttpURLConnection(下载器) 全部生效;
- *      MailFetcher 自建 SSLContext 实例不受影响, 邮件链路保持原样。
+ *      影响面: DefaultHttpDataSource(ExoPlayer) / HttpURLConnection(下载器/片库拉取) 全部生效。
  */
 object TlsCompat {
 
