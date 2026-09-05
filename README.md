@@ -8,7 +8,7 @@
 
 - 📬 **Gitee 收片**：从片源清单（Gitee 仓库 `library.json`）一键拉取，零配置安装即用，无任何账号与凭据
 - 🧩 **幂等合并**：按 `title + episode` 唯一键去重，清单更新只覆盖 url / 元信息，不乱序
-- 🎬 **双端 UI**：TV 遥控器焦点导航（菜单键一键刷新、播放页返回二次确认防误触）；手机触屏卡片列表
+- 🎬 **双端 UI**：TV 遥控器焦点导航（菜单键一键刷新、播放页 OK 直接切换播放/暂停、返回二次确认防误触）；手机触屏卡片列表（点标题弹关于、删除键与片名同行）
 - ⏯️ **断点续播**：播放进度每 10 秒落盘，下次自动定位并提示；看完（≥98%）自动清除
 - ⤓ **先下后播**：m3u8 解析 → 分片下载（断点续传）→ AES-128 解密 → 拼接 TS；本地播放失败自动切在线兜底
 - 🔄 **Gitee 自动更新**：TV / 手机双通道共用一个发布仓库，应用内检查 → 下载 → MD5 校验 → 弹窗安装
@@ -53,8 +53,8 @@ TV 与手机共用发布仓库 `unixsam/mailvod-release` 与同一份 `version.j
 
 ```jsonc
 {
-  "versionCode": 39, "versionName": "0.7.5", "apk": "…/app-tv-debug.apk", "md5": "…",
-  "phone": { "versionCode": 4, "versionName": "0.1.3", "apk": "…/app-phone-debug.apk", "md5": "…" }
+  "versionCode": 40, "versionName": "0.7.6", "apk": "…/app-tv-debug.apk", "md5": "…",
+  "phone": { "versionCode": 5, "versionName": "0.1.4", "apk": "…/app-phone-debug.apk", "md5": "…" }
 }
 ```
 

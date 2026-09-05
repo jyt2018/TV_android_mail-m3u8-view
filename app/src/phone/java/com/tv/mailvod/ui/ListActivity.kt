@@ -45,6 +45,7 @@ class ListActivity : AppCompatActivity() {
         binding = ActivityListBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.tvTitle.text = getString(R.string.app_name)
+        binding.tvTitle.setOnClickListener { showAboutDialog() }
         val ver = runCatching {
             packageManager.getPackageInfo(packageName, 0).versionName
         }.getOrDefault("?")
@@ -125,7 +126,11 @@ class ListActivity : AppCompatActivity() {
         }
         val etUrl = EditText(this).apply {
             hint = "https://gitee.com/..."
-            setSingleLine(true)
+            // 多行(3 行自动换行): 长地址能完整显示, 不再单行横向滚动
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            setLines(3)
+            gravity = android.view.Gravity.TOP or android.view.Gravity.START
             setText(cfg.libraryUrl)
         }
         layout.addView(label(getString(R.string.settings_url_hint)))
@@ -145,6 +150,21 @@ class ListActivity : AppCompatActivity() {
                 doRefresh()
             }
             .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** 关于弹窗(点左上角标题触发): 版本、开发者、检查更新入口。 */
+    private fun showAboutDialog() {
+        val info = packageManager.getPackageInfo(packageName, 0)
+        val message = getString(R.string.about_developer) +
+            "\n版本: v " + info.versionName + " (" + info.versionCode + ")" +
+            "\n\n" + getString(R.string.about_usage)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.about_title)
+            .setIcon(R.mipmap.ic_launcher)
+            .setMessage(message)
+            .setPositiveButton(android.R.string.ok, null)
+            .setNeutralButton(R.string.update_check) { _, _ -> updater.check(manual = true) }
             .show()
     }
 

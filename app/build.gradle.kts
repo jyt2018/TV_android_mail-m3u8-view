@@ -21,14 +21,14 @@ android {
         create("tv") {
             dimension = "device"
             applicationId = "com.tv.mailvod"
-            versionCode = 39
-            versionName = "0.7.5"
+            versionCode = 40
+            versionName = "0.7.6"
         }
         create("phone") {
             dimension = "device"
             applicationId = "com.mailvod.phone"
-            versionCode = 4
-            versionName = "0.1.3"
+            versionCode = 5
+            versionName = "0.1.4"
         }
     }
 

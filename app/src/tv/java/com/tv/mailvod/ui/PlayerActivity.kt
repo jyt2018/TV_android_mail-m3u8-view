@@ -11,7 +11,7 @@ import com.tv.mailvod.playback.VodPlayer
 /**
  * 全屏播放页（TV 壳）。播放核心在共用 VodPlayer(HLS/headers/续播/兜底)。
  *
- * 遥控器：OK 暂停/播放，左/右 ±10s（PlayerView 默认 controller），返回=2 秒内连按两次退出(防误触)。
+ * 遥控器：OK 直接切换播放/暂停(不弹控制条)，左/右 ±10s，返回=2 秒内连按两次退出(防误触)。
  */
 class PlayerActivity : ComponentActivity() {
 
@@ -23,6 +23,9 @@ class PlayerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        // OK 键直接切换播放/暂停: 关闭 PlayerView 的自动弹出控制条
+        // (默认在暂停/出错时会自动 show, 会抢走 OK 键且挡画面)
+        binding.playerView.controllerAutoShow = false
 
         val url = intent.getStringExtra(EXTRA_URL) ?: run {
             finish(); return
@@ -55,29 +58,28 @@ class PlayerActivity : ComponentActivity() {
         vod.release()
     }
 
-    /** 遥控器按键定制: OK=暂停/继续, 左右=快退/快进 10s。 */
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        val p = vod.player ?: return super.onKeyDown(keyCode, event)
-        when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                if (p.isPlaying) {
-                    p.pause()
-                    binding.playerView.showController() // 暂停时弹出控制条(有进度条反馈)
-                } else {
-                    p.play()
+    /** 遥控器按键定制: OK=播放/暂停切换(不弹控制条), 左右=快退/快进 10s。在分发层拦截, 不受焦点影响。 */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val p = vod.player
+        if (p != null && event.action == KeyEvent.ACTION_DOWN) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                    if (event.repeatCount == 0) {
+                        if (p.isPlaying) p.pause() else p.play()
+                    }
+                    return true
                 }
-                return true
-            }
-            KeyEvent.KEYCODE_DPAD_LEFT -> {
-                p.seekTo((p.currentPosition - 10_000).coerceAtLeast(0))
-                return true
-            }
-            KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                p.seekTo(p.currentPosition + 10_000)
-                return true
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    p.seekTo((p.currentPosition - 10_000).coerceAtLeast(0))
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    p.seekTo(p.currentPosition + 10_000)
+                    return true
+                }
             }
         }
-        return super.onKeyDown(keyCode, event)
+        return super.dispatchKeyEvent(event)
     }
 
     /** 返回键防误触: 第一次提示, 2 秒内再按一次才退出(进度照常落盘)。 */
