@@ -38,6 +38,7 @@ class ListActivity : ComponentActivity() {
     private lateinit var adapter: VideoAdapter
     private val fetcher = MailFetcher()
     private var downloader: M3u8Downloader? = null
+    private val updater = com.tv.mailvod.net.AppUpdater(this, com.tv.mailvod.net.UpdateChecker.CHANNEL_TV)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -114,25 +115,7 @@ class ListActivity : ComponentActivity() {
         if (App.instance.configLoader.config.mail.user.isNotBlank()) doRefresh()
     }
 
-    /** 弹"发现新版本"对话框, 确认后调系统安装器(FileProvider 暴露 cacheDir/update.apk)。 */
-    private fun promptUpdateInstall(apk: java.io.File) {
-        val uri = androidx.core.content.FileProvider.getUriForFile(
-            this, "${packageName}.fileprovider", apk
-        )
-        AlertDialog.Builder(this)
-            .setTitle(R.string.update_found)
-            .setMessage(R.string.update_msg)
-            .setPositiveButton(R.string.update_install) { _, _ ->
-                runCatching {
-                    val intent = android.content.Intent(android.content.Intent.ACTION_INSTALL_PACKAGE, uri)
-                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    startActivity(intent)
-                }.onFailure { Toast.makeText(this, it.message, Toast.LENGTH_LONG).show() }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
+    /** 弹"发现新版本"对话框逻辑在共用 AppUpdater; 此处仅保留调用入口。 */
 
     override fun onResume() {
         super.onResume()
@@ -141,48 +124,7 @@ class ListActivity : ComponentActivity() {
             startActivity(Intent(this, SetupActivity::class.java))
         }
         // 自动检查更新(TV 上按返回退出进程常驻, onCreate 不再重跑 → 挪到 onResume + 30 分钟节流)
-        if (System.currentTimeMillis() -
-            getSharedPreferences("update", MODE_PRIVATE).getLong("last_check", 0) > 30 * 60 * 1000L
-        ) checkUpdate(manual = false)
-    }
-
-    /**
-     * 检查 Gitee 更新; 有新版下载并弹安装窗。
-     * manual=true 时绕过节流并给"已是最新/检查失败"反馈(关于对话框按钮)。
-     */
-    private fun checkUpdate(manual: Boolean) {
-        getSharedPreferences("update", MODE_PRIVATE).edit()
-            .putLong("last_check", System.currentTimeMillis()).apply()
-        if (manual) Toast.makeText(this, R.string.update_checking, Toast.LENGTH_SHORT).show()
-        lifecycleScope.launch {
-            val checker = com.tv.mailvod.net.UpdateChecker(applicationContext)
-            val info = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                checker.fetchRemoteVersion()
-            }
-            if (info == null) {
-                if (manual) Toast.makeText(this@ListActivity, R.string.update_check_fail,
-                    Toast.LENGTH_LONG).show()
-                return@launch
-            }
-            val local = runCatching {
-                packageManager.getPackageInfo(packageName, 0).versionCode
-            }.getOrDefault(0)
-            if (info.versionCode <= local) {
-                if (manual) Toast.makeText(this@ListActivity,
-                    getString(R.string.update_latest, info.versionName),
-                    Toast.LENGTH_LONG).show()
-                return@launch
-            }
-            val apk = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                checker.downloadUpdate(info)
-            }
-            if (apk == null) {
-                if (manual) Toast.makeText(this@ListActivity, R.string.update_download_fail,
-                    Toast.LENGTH_LONG).show()
-                return@launch
-            }
-            promptUpdateInstall(apk)
-        }
+        if (updater.shouldAutoCheck()) updater.check(manual = false)
     }
 
     /** 遥控器菜单键(KEYCODE_MENU=82) = 刷新。 */
@@ -243,7 +185,7 @@ class ListActivity : ComponentActivity() {
             .setIcon(R.drawable.ic_head)
             .setMessage(message)
             .setPositiveButton(android.R.string.ok, null)
-            .setNeutralButton(R.string.update_check) { _, _ -> checkUpdate(manual = true) }
+            .setNeutralButton(R.string.update_check) { _, _ -> updater.check(manual = true) }
             .show()
     }
 

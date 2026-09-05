@@ -43,7 +43,7 @@ class SetupActivity : AppCompatActivity() {
         })
         root.addView(title(getString(R.string.setup_user_hint)))
         etUser = EditText(this).apply {
-            hint = "jin_ying@163.com"
+            hint = "example@163.com"
             setSingleLine(true)
             setTextColor(getColor(R.color.text_primary))
             setHintTextColor(getColor(R.color.text_secondary))

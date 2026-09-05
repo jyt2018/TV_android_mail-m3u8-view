@@ -11,12 +11,13 @@ import com.tv.mailvod.playback.VodPlayer
 /**
  * 全屏播放页（TV 壳）。播放核心在共用 VodPlayer(HLS/headers/续播/兜底)。
  *
- * 遥控器：OK 暂停/播放，左/右 ±10s（PlayerView 默认 controller），返回退出。
+ * 遥控器：OK 暂停/播放，左/右 ±10s（PlayerView 默认 controller），返回=2 秒内连按两次退出(防误触)。
  */
 class PlayerActivity : ComponentActivity() {
 
     private lateinit var binding: ActivityPlayerBinding
     private lateinit var vod: VodPlayer
+    private var lastBackAt = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,6 +78,17 @@ class PlayerActivity : ComponentActivity() {
             }
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    /** 返回键防误触: 第一次提示, 2 秒内再按一次才退出(进度照常落盘)。 */
+    override fun onBackPressed() {
+        val now = System.currentTimeMillis()
+        if (now - lastBackAt < 2000) {
+            finish()
+        } else {
+            lastBackAt = now
+            Toast.makeText(this, R.string.back_again, Toast.LENGTH_SHORT).show()
+        }
     }
 
     companion object {

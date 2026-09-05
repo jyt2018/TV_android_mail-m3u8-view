@@ -1,8 +1,8 @@
-# MailM3U8 TV 设计文档（v0.6.3）
+# MailM3U8 TV 设计文档（v0.7.4）
 
-> TV 端「邮箱投递影片 → 合并到本地 JSON → 列表选择 → 播放 m3u8」
-> 状态：已实现（收片通、UI 打磨中）
-> 日期：2026-09-02
+> TV 端「邮箱投递影片 → 合并到本地 JSON → 列表选择 → 播放 m3u8」+ 手机版（phone flavor）
+> 状态：已实现（收片通、双端自动更新已上线、UI 打磨中）
+> 日期：2026-09-05
 
 ---
 
@@ -16,8 +16,9 @@
 ### 1.2 明确不做
 - 不用 Room 数据库，仅一个 JSON 数组文件 `library.json`。
 - 不做后台轮询 / 开机自启：启动时拉取一次 + 列表页「刷新」键手动拉取。
-- 不做详情页 / 海报 / 续播记忆 / 多集菜单。
+- 不做详情页 / 海报 / 多集菜单。
 - 不做 SMTP 回执。
+- （v0.7.1 已补充实现：断点续播记忆，见 §11.2）
 
 ---
 
@@ -87,7 +88,7 @@
 ## 3. 配置文件 config.json
 
 位置：应用私有目录 `/data/data/<包名>/files/config.json`。
-首次启动从 `assets/config.json` 复制过去。已有文件**不会**被覆盖（便于部署后手动改配置）。
+**v0.7.0 起 APK 不再打包 assets/config.json**（防逆向泄露授权码）：首次启动无配置时跳转 SetupActivity，由用户输入邮箱与授权码后写入。已有文件不会被覆盖。输入框提示为通用示例 `example@163.com`，不含真实账号。
 
 ```jsonc
 {
@@ -219,7 +220,7 @@
 | **左** | 行内：删除键 → 先下后播 → 在线播放；在线播放左 → 上一行（RecyclerView 默认） |
 | **OK** | 焦点在在线播放键 → 播放页(HLS); 先下后播/本地播放 → 下载弹窗或本地播放; 删除键 → 删除确认弹窗; 刷新键 → 重新拉取 |
 | **菜单键** | 全局监听 `KeyEvent.KEYCODE_MENU`（=82），等价于点刷新按钮 |
-| **返回** | 播放页返回片库页（停止播放） |
+| **返回** | 播放页 2 秒内连按两次返回片库页（v0.7.4 防误触：第一次弹 Toast「再按一次返回键返回列表」，进度照常落盘；手机版无此拦截） |
 
 **方向键强制路由**：代码中显式设置了 `btnPlay.nextFocusRightId = btnDownloadPlay`、`btnDownloadPlay.nextFocusLeftId = btnPlay`、`btnDownloadPlay.nextFocusRightId = btnDelete`、`btnDelete.nextFocusLeftId = btnDownloadPlay`（v0.6.1 三按钮链），避免 Android 默认焦点引擎选错方向。行根布局不可聚焦（v0.5.4），焦点进入行默认落在 btnPlay。
 
@@ -294,6 +295,8 @@
 | 0.4.0 | 按钮 padding 改了尺寸没变化 | Android Button 类有默认 `minWidth=48dp minHeight=48dp`，padding 再小也被撑住 | 显式设 `android:minWidth="0dp" android:minHeight="0dp"` |
 | 0.4.0 | 表头表体列错位 | 表头和表体各自定义列宽，互不相同；表头末尾没给按钮留占位 | 列宽统一到 `VideoAdapter.buildColumnLayoutParams()`；表头末尾加 56dp+56dp+6dp 占位 View，精确匹配表体按钮宽度 |
 | 0.4.0 | 焦点跳到外部时旧行黄框不消失 | `setHighlight` 只在 RecyclerView 子 View 焦点变化时触发，焦点跳到刷新按钮时没人清 | ListActivity 挂 `addOnGlobalFocusChangeListener`，检测焦点不在 rvList 内时调 `setHighlight(rv, -1)` |
+| 0.7.3 | 本地视频提示"续播"却从 0 开始 | ExoPlayer `setMediaItem/setMediaSource` 默认 resetPosition，先 seekTo 再设媒体源会丢起始位置 | 顺序改为：设媒体源 → seekTo(断点) → prepare() |
+| 0.1.2(phone) | 手机首装拉取 0 条（日志 `SKIP: prefix not match`） | SetupActivity 建的配置落盘了 Config 里过时默认值 `subject_prefix="[TV投递]"`，过滤不到 `m3u8_view` 主题邮件 | 默认值改回 `m3u8_view`；已装设备就地修 config.json；应用内帮助文案同步修正 |
 
 **163 邮箱的两个已知限制**：
 1. `SEARCH` 命令对 UTF-8 charset 支持有坑（`SEARCH CHARSET UTF-8 SUBJECT "m3u8_view"` 返回 0）。解决：`SEARCH ALL` 全量拉取后客户端按 subject 过滤，不走 charset SEARCH。
@@ -313,7 +316,7 @@ app/src/
 │   │   ├── playback/VodPlayer.kt      ExoPlayer 核心(HLS/headers/断点续播/本地兜底, 2026-09-04 抽取共用)
 │   │   ├── store/                     LibraryStore / ProgressStore / VideoItem
 │   │   ├── config/                    Config / ConfigLoader
-│   │   ├── net/                       TlsCompat / UpdateChecker
+│   │   ├── net/                       TlsCompat / UpdateChecker(双通道版本清单) / AppUpdater(更新流程)
 │   │   ├── ui/SetupActivity.kt        首次配置向导(纯代码 UI, 两版共用)
 │   │   └── App.kt                     Application 单例
 │   ├── res/                           mipmap 桌面图标 + colors + strings(公共)
@@ -332,8 +335,8 @@ app/src/
 技术栈：Kotlin + RecyclerView + ExoPlayer 2.18.5 + OkHttp 4.9.3 + kotlinx.serialization + android-mail 1.6.7。
 
 minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug 签名）：
-- `gradle assembleTvDebug` → `app/build/outputs/apk/tv/debug/app-tv-debug.apk`（com.tv.mailvod，0.7.2 / 36）
-- `gradle assemblePhoneDebug` → `app/build/outputs/apk/phone/debug/app-phone-debug.apk`（com.mailvod.phone，0.1.0 / 1）
+- `gradle assembleTvDebug` → `app/build/outputs/apk/tv/debug/app-tv-debug.apk`（com.tv.mailvod，0.7.4 / 38）
+- `gradle assemblePhoneDebug` → `app/build/outputs/apk/phone/debug/app-phone-debug.apk`（com.mailvod.phone，0.1.2 / 3）
 - leanback 依赖仅 `tvImplementation`（手机包不携带）；versionCode/Name 定义在 build.gradle.kts 的 productFlavors 内，各版本独立演进
 
 ---
@@ -398,12 +401,12 @@ minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug �
 | 维度 | TV 版 | 手机版 |
 |---|---|---|
 | 包名 | com.tv.mailvod | com.mailvod.phone（可共存/并行调试） |
-| 版本 | 0.7.2 / 36 独立演进 | 0.1.0 / 1 独立演进 |
+| 版本 | 0.7.4 / 38 独立演进 | 0.1.2 / 3 独立演进 |
 | 入口 | LEANBACK_LAUNCHER + LAUNCHER | 仅 LAUNCHER |
 | 主题 | Theme.Leanback 系 | Theme.AppCompat.NoActionBar 系（同深色配色） |
-| 播放交互 | 遥控器 OK/左右键 | ExoPlayer 默认触控条，默认横屏(sensorLandscape) |
+| 播放交互 | 遥控器 OK/左右键, 返回=二次确认退出(0.7.4 防误触) | ExoPlayer 默认触控条, 默认横屏(sensorLandscape), 返回直接退出 |
 | 列表交互 | D-pad 焦点高亮 + 表头表格 | 卡片行(标题/元信息/已下载标签) + 行内按钮 |
-| 自动更新 | 有(REQUEST_INSTALL_PACKAGES) | MVP 无 |
+| 自动更新 | 有(REQUEST_INSTALL_PACKAGES) | 有(0.1.1 起, 同权限) |
 | 搜索页 | 界面壳已实现 | MVP 无，后续补 |
 
 ### 11.2 共用抽取（避免两份拷贝）
@@ -412,9 +415,17 @@ minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug �
 - `VodPlayer`：ExoPlayer 构建/HLS+headers/断点续播(10s 落盘)/本地损坏切在线兜底（原 TV PlayerActivity 主体上提；TV 只留按键处理，phone 只留生命周期转发）
 - `SetupActivity`：纯代码 UI 无布局依赖，直接沉到 main 两版共用；phone 版措辞差异（"遥控器 OK 键"→触屏文案）通过 flavor strings 覆盖实现
 
-### 11.3 phone 版后续可做
+### 11.3 自动更新（Gitee 双通道, 2026-09-05）
+
+两版本共用同一个 Gitee 仓库 `unixsam/mailvod-release` 与同一份 `version.json`：
+- 顶层 = tv 段（保持旧格式，兼容已装旧包）；`"phone": {...}` 子对象 = 手机版
+- `UpdateChecker` 按 channel 取段；检查/下载/安装弹窗逻辑统一在共用 `AppUpdater`
+- 发布：`py _tmp\publish_gitee.py --flavor tv|phone`（自动合并另一 flavor 的段；合并基准必须走 Gitee contents API——raw 直链有 CDN 缓存，曾把 phone 段覆盖丢失）
+- 手机已装包用旧格式判断无影响；phone 从 0.1.1 起具备自动更新能力
+- **端到端实证（2026-09-05）**：手机 0.1.1→0.1.2、电视 0.7.3→0.7.4 均经 Gitee 自动更新完成（检查→下载→MD5 校验→弹窗→用户确认→系统安装器），双通道互不干扰
+
+### 11.4 phone 版后续可做
 
 - 搜索页（对齐 TV）
-- 自动更新（可复用 UpdateChecker，需补 REQUEST_INSTALL_PACKAGES 权限）
 - 竖屏海报式列表（当前为信息行式）
-- 真机验收：aapt 已验证包名/版本/图标/入口，触屏交互待用户真机实测
+- 播放页返回键二次确认（TV 已加 0.7.4，手机暂无需求）

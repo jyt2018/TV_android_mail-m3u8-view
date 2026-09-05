@@ -4,6 +4,7 @@ import android.app.Activity
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.widget.Toast
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
@@ -57,18 +58,21 @@ class VodPlayer(
         val mediaItem = MediaItem.Builder().setUri(uri).build()
 
         player = ExoPlayer.Builder(activity).build()
-        // 继续播放: 有未完成进度则先定位再 prepare
-        val saved = App.instance.progress.get(progressKey)
-        if (saved != null && saved.positionMs > 0) {
-            player?.seekTo(saved.positionMs)
-            Toast.makeText(activity, activity.getString(R.string.resume_from, fmtTime(saved.positionMs)),
-                Toast.LENGTH_SHORT).show()
-        }
+        // 先设置媒体源: ExoPlayer 的 setMediaItem/setMediaSource 默认 resetPosition=true,
+        // 若先 seekTo 再 setMediaSource, 断点位置会被丢弃(表现为提示续播却从 0 开始)
         if (isLocal) {
             // 本地文件 (mp4/ts), 让 ExoPlayer 按容器自动推断媒体源
             player?.setMediaItem(mediaItem)
         } else {
             player?.setMediaSource(hlsSourceFor(uri))
+        }
+        // 继续播放: prepare 之前的 seekTo 作为起始位置
+        val saved = App.instance.progress.get(progressKey)
+        if (saved != null && saved.positionMs > 0) {
+            player?.seekTo(saved.positionMs)
+            Log.i(TAG, "resume [$progressKey] seek to ${saved.positionMs}ms")
+            Toast.makeText(activity, activity.getString(R.string.resume_from, fmtTime(saved.positionMs)),
+                Toast.LENGTH_SHORT).show()
         }
         player?.prepare()
         player?.playWhenReady = true
@@ -77,6 +81,12 @@ class VodPlayer(
         saveHandler.post(saveRunnable)
 
         player?.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_READY) {
+                    Log.i(TAG, "ready [$progressKey] at ${player?.currentPosition}ms")
+                }
+            }
+
             override fun onPlayerError(error: PlaybackException) {
                 // 本地文件损坏/不可播时自动切换在线源 (兜底)
                 if (isLocal && !fallbackUsed && fallbackUrl != null) {
@@ -140,4 +150,8 @@ class VodPlayer(
                 .setUserAgent("MailVod")
                 .setDefaultRequestProperties(headers)
         ).createMediaSource(MediaItem.Builder().setUri(uri).build())
+
+    companion object {
+        private const val TAG = "VodPlayer"
+    }
 }

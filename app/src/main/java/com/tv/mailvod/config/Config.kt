@@ -22,7 +22,7 @@ data class Config(
         @SerialName("auth_code")
         val authCode: String = "",
         @SerialName("subject_prefix")
-        val subjectPrefix: String = "[TV投递]",
+        val subjectPrefix: String = "m3u8_view",
         val folder: String = "INBOX"
     )
 

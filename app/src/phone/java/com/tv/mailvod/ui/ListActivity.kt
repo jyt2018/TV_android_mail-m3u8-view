@@ -37,6 +37,8 @@ class ListActivity : AppCompatActivity() {
     private lateinit var adapter: VideoAdapter
     private val fetcher = MailFetcher()
     private var downloader: M3u8Downloader? = null
+    private val updater = com.tv.mailvod.net.AppUpdater(
+        this, com.tv.mailvod.net.UpdateChecker.CHANNEL_PHONE)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,6 +74,8 @@ class ListActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         loadList()
+        // Gitee 自动更新(与 TV 共用 AppUpdater, 30 分钟节流)
+        if (updater.shouldAutoCheck()) updater.check(manual = false)
     }
 
     private fun loadList() {
@@ -129,7 +133,7 @@ class ListActivity : AppCompatActivity() {
             textSize = 13f
         }
         val etUser = EditText(this).apply {
-            hint = "jin_ying@163.com"
+            hint = "example@163.com"
             setSingleLine(true)
             setText(cfg.mail.user)
         }

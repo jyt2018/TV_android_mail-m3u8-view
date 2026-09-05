@@ -12,6 +12,7 @@ import java.security.MessageDigest
 /**
  * 自动更新检查：启动时后台拉取 Gitee 上的 version.json,
  * 若远端 versionCode 更大则下载 APK 到 cacheDir 并做 md5 校验。
+ * version.json 顶层为 tv 版字段(兼容旧包), "phone" 子对象为手机版; 按 channel 取段。
  * 任何失败都静默(仅日志), 不打扰正常使用。
  */
 class UpdateChecker(private val context: Context) {
@@ -21,6 +22,10 @@ class UpdateChecker(private val context: Context) {
 
         /** version.json 在 Gitee 公开仓库的 raw 直链(仓库 mailvod-release, 只放 APK 与版本清单)。 */
         const val VERSION_URL = "https://gitee.com/unixsam/mailvod-release/raw/master/version.json"
+
+        /** 更新通道: tv = version.json 顶层(旧格式), phone = "phone" 子对象。 */
+        const val CHANNEL_TV = "tv"
+        const val CHANNEL_PHONE = "phone"
     }
 
     @Serializable
@@ -33,9 +38,9 @@ class UpdateChecker(private val context: Context) {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** 只拉远端版本清单(不下载); 失败返回 null(网络/解析错误)。 */
-    fun fetchRemoteVersion(): VersionInfo? =
-        runCatching { fetchJson() }.getOrElse {
+    /** 只拉远端版本清单(不下载); channel=tv/phone; 失败返回 null(网络/解析错误)。 */
+    fun fetchRemoteVersion(channel: String = CHANNEL_TV): VersionInfo? =
+        runCatching { fetchJson(channel) }.getOrElse {
             Log.w(TAG, "check skip: ${it.message}")
             null
         }
@@ -55,20 +60,28 @@ class UpdateChecker(private val context: Context) {
     }
 
     /** 检查并下载更新(阻塞网络 IO, 必须在后台线程调用); 成功返回待安装的 APK 文件, 否则 null。 */
-    fun checkAndDownload(): File? {
+    fun checkAndDownload(channel: String = CHANNEL_TV): File? {
         val local = runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionCode
         }.getOrDefault(0)
-        val info = fetchRemoteVersion() ?: return null
+        val info = fetchRemoteVersion(channel) ?: return null
         if (info.versionCode <= local) return null
         Log.i(TAG, "found update ${info.versionName} (code=${info.versionCode})")
         return downloadUpdate(info)
     }
 
     /** 本地 versionCode 是否已 >= 远端(外部 UI 判断用)。 */
-    private fun fetchJson(): VersionInfo {
-        val bytes = httpGet(VERSION_URL)
-        return json.decodeFromString(VersionInfo.serializer(), String(bytes, Charsets.UTF_8))
+    private fun fetchJson(channel: String): VersionInfo {
+        val root = json.decodeFromString(
+            kotlinx.serialization.json.JsonObject.serializer(),
+            String(httpGet(VERSION_URL), Charsets.UTF_8)
+        )
+        val node = if (channel == CHANNEL_PHONE) {
+            root["phone"] ?: throw java.io.IOException("version.json 缺少 phone 段")
+        } else {
+            root // tv: 顶层即 tv 字段(旧格式)
+        }
+        return json.decodeFromString(VersionInfo.serializer(), node.toString())
     }
 
     private fun download(urlStr: String): File {
