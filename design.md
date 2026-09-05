@@ -4,7 +4,7 @@
 > 状态：已实现（Gitee 收片、双端自动更新已上线、UI 打磨中）
 > 日期：2026-09-05
 
-> **v0.7.6 变更**：TV 播放页 OK 键直接切换播放/暂停（`controllerAutoShow=false` + dispatchKeyEvent 分发层拦截，不再弹控制条）；手机端：关于弹窗（点左上角标题）、设置输入框 3 行换行显示长地址、列表行删除按钮移到片名行右侧、播放按钮(40dp/14sp)与刷新键一致。
+> **v0.7.6 变更**：TV 播放页 OK 键直接切换播放/暂停（`controllerAutoShow=false` + dispatchKeyEvent 分发层拦截，不再弹控制条）；手机端：关于弹窗（点左上角标题）、设置输入框多行换行 + 四周描边框状背景、列表行删除按钮移到片名行右侧（0.1.5 增大并带垃圾桶 emoji，文字规格与其它按钮一致）、播放按钮(40dp/14sp)与刷新键一致。
 > **v0.7.5 重大变更**：全面移除邮箱(IMAP)收片通道，改为 Gitee 仓库 `library.json` 片源清单（一次 HTTPS GET，零配置可用）。
 > 历史邮件方案的全部设计/坑记录保留在 §2/§7 作留底。
 
@@ -296,7 +296,7 @@ app/src/
 
 minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug 签名）：
 - `gradle assembleTvDebug` → `app/build/outputs/apk/tv/debug/app-tv-debug.apk`（com.tv.mailvod，0.7.6 / 40）
-- `gradle assemblePhoneDebug` → `app/build/outputs/apk/phone/debug/app-phone-debug.apk`（com.mailvod.phone，0.1.4 / 5）
+- `gradle assemblePhoneDebug` → `app/build/outputs/apk/phone/debug/app-phone-debug.apk`（com.mailvod.phone，0.1.5 / 6）
 - leanback 依赖仅 `tvImplementation`（手机包不携带）；versionCode/Name 定义在 build.gradle.kts 的 productFlavors 内，各版本独立演进
 
 ---
@@ -357,13 +357,13 @@ minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug �
 | 维度 | TV 版 | 手机版 |
 |---|---|---|
 | 包名 | com.tv.mailvod | com.mailvod.phone（可共存/并行调试） |
-| 版本 | 0.7.6 / 40 独立演进 | 0.1.4 / 5 独立演进 |
+| 版本 | 0.7.6 / 40 独立演进 | 0.1.5 / 6 独立演进 |
 | 入口 | LEANBACK_LAUNCHER + LAUNCHER | 仅 LAUNCHER |
 | 主题 | Theme.Leanback 系 | Theme.AppCompat.NoActionBar 系（同深色配色） |
 | 播放交互 | 遥控器 OK=播放/暂停直接切换(0.7.6 起不弹控制条, dispatchKeyEvent 拦截), 左右 ±10s, 返回=二次确认退出 | ExoPlayer 默认触控条, 默认横屏(sensorLandscape), 返回直接退出 |
-| 列表交互 | D-pad 焦点高亮 + 表头表格 | 卡片行(标题/元信息/已下载标签/删除键靠右与片名同行) + 按钮行(播放/先下后播, 与刷新键同规格) |
+| 列表交互 | D-pad 焦点高亮 + 表头表格 | 卡片行(标题/元信息/已下载标签/删除键靠右与片名同行, 0.1.5 起带垃圾桶 emoji 与其它键同规格) + 按钮行(播放/先下后播, 与刷新键同规格) |
 | 关于弹窗 | 点头像图标弹出 | 点左上角标题「松松看片」弹出(0.1.4 起) |
-| 设置弹窗 | dialog_settings 布局(片库地址) | 代码构建布局(片库地址) |
+| 设置弹窗 | dialog_settings 布局(片库地址) | 代码构建布局(片库地址, 0.1.5 起 3 行自动换行 + 四周描边框状背景 bg_edit_box) |
 | 自动更新 | 有(REQUEST_INSTALL_PACKAGES) | 有(0.1.1 起, 同权限) |
 | 搜索页 | 界面壳已实现 | MVP 无，后续补 |
 

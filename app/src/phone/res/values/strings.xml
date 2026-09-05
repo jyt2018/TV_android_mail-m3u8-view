@@ -3,4 +3,5 @@
 <resources>
     <string name="empty_hint">暂无影片\n\n点【刷新】从片库地址拉取</string>
     <string name="confirm_ok">确认删除？删除后不可恢复</string>
+    <string name="action_delete_icon">删除 🗑️</string>
 </resources>

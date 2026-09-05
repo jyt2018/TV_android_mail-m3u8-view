@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 手机版设置弹窗输入框背景: 四周描边的圆角框(替代系统下划线样式) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FF1A1F26" />
+    <corners android:radius="6dp" />
+    <stroke
+        android:width="1dp"
+        android:color="#FF56606C" />
+</shape>

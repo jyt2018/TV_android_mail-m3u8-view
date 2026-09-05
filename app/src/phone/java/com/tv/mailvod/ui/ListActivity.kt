@@ -126,12 +126,17 @@ class ListActivity : AppCompatActivity() {
         }
         val etUrl = EditText(this).apply {
             hint = "https://gitee.com/..."
-            // 多行(3 行自动换行): 长地址能完整显示, 不再单行横向滚动
+            // 多行(带 MULTI_LINE 标志才有自动换行): 长地址完整显示, 不再单行横向滚动
             inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
                 android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             setLines(3)
             gravity = android.view.Gravity.TOP or android.view.Gravity.START
             setText(cfg.libraryUrl)
+            // 四周描边的框状外观(替代系统下划线); 换背景后系统内边距失效, 需手动补
+            background = androidx.core.content.ContextCompat.getDrawable(
+                this@ListActivity, R.drawable.bg_edit_box)
+            setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (10 * dp).toInt())
         }
         layout.addView(label(getString(R.string.settings_url_hint)))
         layout.addView(etUrl)
