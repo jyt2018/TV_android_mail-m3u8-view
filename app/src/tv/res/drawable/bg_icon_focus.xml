@@ -3,7 +3,7 @@
     <!-- 聚焦(遥控器光标移上)时: 黄色圆角描边 -->
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <stroke android:width="3dp" android:color="#FFD700" />
+            <stroke android:width="2dp" android:color="#FFD700" />
             <corners android:radius="12dp" />
             <solid android:color="#00000000" />
         </shape>

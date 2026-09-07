@@ -15,7 +15,7 @@ import javax.crypto.spec.SecretKeySpec
 /**
  * M3U8 下载引擎 (移植自 H:\downmovie\script\m3u8_download.py)。
  *
- * 流程: 获取 m3u8 (master→子列表) → 广告检测/校验/去除 (仅量子 lz 源)
+ * 流程: 获取 m3u8 (master→子列表) → 广告检测/去除 (PTS 时间轴法, 通用唯一算法, 见 AdDetector)
  *      → 多线程下载 TS 分片 (断点续传 + AES-128 解密) → 二进制拼接 TS
  *      → 重命名 TS 为最终产物 (ExoPlayer 原生支持 MPEG-TS, 跳过重封装)。
  *
@@ -101,15 +101,28 @@ class M3u8Downloader(
             text = String(httpGet(listUrl), Charsets.UTF_8)
         }
 
-        // 解析分片 + AES-128 key
+        // 解析分片 (含 EXTINF 时长与不连续分组) + AES-128 key
         var mediaSeq = 0L
         var curKey: KeyInfo? = null
+        var pendingDur = 0.0
         val segments = mutableListOf<Segment>()
+        val segDur = mutableListOf<Double>()
+        val groups = mutableListOf<MutableList<Int>>()
+        var curGroup = mutableListOf<Int>()
         for (raw in text.split('\n')) {
             val line = raw.trim()
             when {
                 line.startsWith("#EXT-X-MEDIA-SEQUENCE:") ->
                     mediaSeq = line.substringAfter(':').toLongOrNull() ?: 0L
+                line.startsWith("#EXTINF:") ->
+                    pendingDur = line.substringAfter(':').substringBefore(',').trim().toDoubleOrNull() ?: 0.0
+                line.startsWith("#EXT-X-DISCONTINUITY") &&
+                    !line.startsWith("#EXT-X-DISCONTINUITY-SEQUENCE") -> {
+                    if (curGroup.isNotEmpty()) {
+                        groups.add(curGroup)
+                        curGroup = mutableListOf()
+                    }
+                }
                 line.startsWith("#EXT-X-KEY") && line.contains("METHOD=AES-128") -> {
                     val uri = Regex("URI=[\"']([^\"']+)[\"']").find(line)?.groupValues?.get(1)
                     if (uri != null) {
@@ -118,15 +131,27 @@ class M3u8Downloader(
                     }
                 }
                 line.startsWith("#EXT-X-KEY") && line.contains("METHOD=NONE") -> curKey = null
-                line.isNotEmpty() && !line.startsWith("#") ->
+                line.isNotEmpty() && !line.startsWith("#") -> {
+                    curGroup.add(segments.size)
+                    segDur.add(pendingDur)
+                    pendingDur = 0.0
                     segments.add(Segment(resolveUrl(listUrl, line), curKey, mediaSeq++))
+                }
             }
         }
+        if (curGroup.isNotEmpty()) groups.add(curGroup)
         if (segments.isEmpty()) throw IOException("播放列表中无 TS 分片")
 
-        // 广告检测 (仅量子 lz 源), 返回 null = 检测关闭或误判跳过
-        val host = URL(listUrl).host.lowercase()
-        val adIdx = if (host.contains("lz")) detectAds(segments) else null
+        // 广告检测 (PTS 时间轴法, 唯一算法), null = 放弃剔除或无广告
+        listener.onProgress("正在检测广告…", 0, true)
+        val adIdx = AdDetector.detect(
+            groups, segDur,
+            groups.map { segments[it.first()].url },
+            File(workDir.parentFile, "adcache"), sha256(text), ::httpGetHead
+        ) { done, total ->
+            listener.onProgress("正在检测广告 $done/$total", done * 100 / total)
+        }
+        if (cancelled) return
         val finalSegs = if (adIdx.isNullOrEmpty()) segments
         else segments.filterIndexed { i, _ -> i !in adIdx }
 
@@ -216,45 +241,6 @@ class M3u8Downloader(
         return cipher.doFinal(data)
     }
 
-    // ═══════════════════════ 广告检测 (量子 lz 源) ═══════════════════════
-
-    /**
-     * 量子源 TS 文件名数字递增, 相邻不连续处翻转广告状态 (同 python 版算法)。
-     * 校验: >6 组或占比 >30% 判为误判, 返回 null 跳过去除。
-     */
-    private fun detectAds(segments: List<Segment>): Set<Int>? {
-        val nums = segments.map { tsNumber(it.url) }
-        val adIdx = mutableSetOf<Int>()
-        val groups = mutableListOf<Int>()
-        var adIn = false
-        var curLen = 0
-        for (j in 1 until nums.size) {
-            val p = nums[j - 1]
-            val c = nums[j]
-            if (p != null && c != null && c != p + 1) {
-                adIn = !adIn
-                if (adIn) curLen = 0 else { groups.add(curLen); curLen = 0 }
-            }
-            if (adIn) { adIdx.add(j); curLen++ }
-        }
-        if (adIn && curLen > 0) groups.add(curLen)
-
-        if (groups.isEmpty()) return null
-        if (groups.size > 6) return null
-        if (adIdx.size * 100 > segments.size * 30) return null
-        return adIdx
-    }
-
-    /** 从 TS 文件名末尾提取连续数字, 例如 '4e2620cf1d64721621.ts' → 64721621。 */
-    private fun tsNumber(url: String): Long? {
-        val base = url.substringAfterLast('/')
-        Regex("(\\d+)\\.ts$", RegexOption.IGNORE_CASE).find(base)?.let {
-            return it.groupValues[1].toLongOrNull()
-        }
-        val digits = base.filter { c -> c.isDigit() }
-        return if (digits.isEmpty()) null else digits.toLongOrNull()
-    }
-
     // ═══════════════════════ HTTP 工具 ═══════════════════════
 
     /** 线程池: 给 httpGet 提供硬超时护栏 (connectTimeout 不覆盖 DNS 解析, DNS 挂起会卡到 OS 级超时)。 */
@@ -290,6 +276,59 @@ class M3u8Downloader(
             conn?.disconnect()
         }
     }
+
+    /** 抓取 URL 头部 maxBytes 字节 (Range 请求; 服务器不支持时读到指定量即断开)。失败重试 3 次, 全败返回 null。 */
+    private fun httpGetHead(urlStr: String, maxBytes: Int = 65536): ByteArray? {
+        repeat(3) { attempt ->
+            if (cancelled) return null
+            try {
+                val future = httpExec.submit(java.util.concurrent.Callable { httpGetHeadOnce(urlStr, maxBytes) })
+                try {
+                    return future.get(20, java.util.concurrent.TimeUnit.SECONDS)
+                } catch (e: java.util.concurrent.TimeoutException) {
+                    future.cancel(true)
+                }
+            } catch (_: Exception) {
+                // 重试
+            }
+            Thread.sleep(500L * (attempt + 1))
+        }
+        return null
+    }
+
+    private fun httpGetHeadOnce(urlStr: String, maxBytes: Int): ByteArray {
+        var conn: HttpURLConnection? = null
+        try {
+            conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 10000
+                readTimeout = 10000
+                instanceFollowRedirects = true
+                setRequestProperty("User-Agent", ua)
+                setRequestProperty("Accept", "*/*")
+                setRequestProperty("Range", "bytes=0-${maxBytes - 1}")
+                headers.forEach { (k, v) -> if (!k.equals("User-Agent", true)) setRequestProperty(k, v) }
+            }
+            val code = conn.responseCode
+            if (code !in 200..299) throw IOException("HTTP $code: $urlStr")
+            val buf = java.io.ByteArrayOutputStream(1 shl 16)
+            conn.inputStream.use { ins ->
+                val chunk = ByteArray(8192)
+                while (buf.size() < maxBytes) {
+                    val r = ins.read(chunk)
+                    if (r < 0) break
+                    buf.write(chunk, 0, r)
+                }
+            }
+            return buf.toByteArray()
+        } finally {
+            conn?.disconnect()
+        }
+    }
+
+    /** 播放清单内容指纹 (SHA-256 十六进制), 用于检测结果缓存键。 */
+    private fun sha256(text: String): String =
+        java.security.MessageDigest.getInstance("SHA-256").digest(text.toByteArray())
+            .joinToString("") { "%02x".format(it) }
 
     private fun resolveUrl(base: String, ref: String): String = URL(URL(base), ref).toString()
 

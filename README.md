@@ -10,7 +10,8 @@
 - 🧩 **幂等合并**：按 `title + episode` 唯一键去重，清单更新只覆盖 url / 元信息，不乱序
 - 🎬 **双端 UI**：TV 遥控器焦点导航（菜单键一键刷新、播放页 OK 直接切换播放/暂停、返回二次确认防误触）；手机触屏卡片列表（点标题弹关于、删除键与片名同行）
 - ⏯️ **断点续播**：播放进度每 10 秒落盘，下次自动定位并提示；看完（≥98%）自动清除
-- ⤓ **先下后播**：m3u8 解析 → 分片下载（断点续传）→ AES-128 解密 → 拼接 TS；本地播放失败自动切在线兜底
+- ✂️ **下载去广告**：PTS 时间轴法自动识别混流广告（量子/非凡源实测零误判），下载时直接剔除广告分片，成片无广告打断（原理见 [remove-ad.md](remove-ad.md)）
+- ⤓ **先下后播**：m3u8 解析 → 去广告检测 → 分片下载（断点续传）→ AES-128 解密 → 拼接 TS；本地播放失败自动切在线兜底
 - 🔄 **Gitee 自动更新**：TV / 手机双通道共用一个发布仓库，应用内检查 → 下载 → MD5 校验 → 弹窗安装
 - 🛡️ **TLS 兼容**：打包 ISRG Root X1 证书，老安卓（≤7.1.1）也能播放 Let's Encrypt 签发的源
 - 🔒 **低依赖**：minSdk 21，ExoPlayer 2.18.5，小米盒子 5（Android TV 5）验证通过
@@ -43,7 +44,7 @@ adb install -r .\app\build\outputs\apk\tv\debug\app-tv-debug.apk
 
 1. 启动即用——片源清单地址已内置默认值（Gitee 公开仓库，无需登录、无凭据）
 2. 按遥控器「菜单 ☰」键（或刷新按钮）从片源清单拉取影片
-3. 「设置 ⚙」按钮可改片源清单地址（默认值预填）
+3. 「设置 ⚙」按钮双输入框：可改 **APK 更新地址** 与 **片源地址**（默认值预填）
 
 已装用户后续更新走应用内**自动更新**（Gitee），无需 adb。
 
@@ -53,8 +54,8 @@ TV 与手机共用发布仓库 `unixsam/mailvod-release` 与同一份 `version.j
 
 ```jsonc
 {
-  "versionCode": 40, "versionName": "0.7.6", "apk": "…/app-tv-debug.apk", "md5": "…",
-  "phone": { "versionCode": 5, "versionName": "0.1.4", "apk": "…/app-phone-debug.apk", "md5": "…" }
+  "versionCode": 42, "versionName": "0.8.0", "apk": "…/app-tv-debug.apk", "md5": "…",
+  "phone": { "versionCode": 8, "versionName": "0.1.7", "apk": "…/app-phone-debug.apk", "md5": "…" }
 }
 ```
 
@@ -64,7 +65,7 @@ TV 与手机共用发布仓库 `unixsam/mailvod-release` 与同一份 `version.j
 
 ### 片源清单维护
 
-片源 = Gitee 仓库 `unixsam/mailvod-release` 的 `library.json`（JSON 数组，每片一个对象）。三种维护方式：
+片源 = JSON 数组清单（每片一个对象），默认放在 Gitee 仓库 `unixsam/mailvod-release` 的 `library.json`。**托管平台不限 Gitee**：应用就是一次普通 HTTPS GET + JSON 解析，任何公开可访问的直链 JSON 均可（自建服务器 / 局域网 HTTP / 对象存储等），改设置页「片源地址」即可。维护方式：
 
 1. **Gitee 网页端直接编辑**——改完等分钟级 CDN 缓存过期再刷新
 2. `py _tmp/push_library.py`——自动从电视端现有片库转换并上传
@@ -94,6 +95,9 @@ TV 与手机共用发布仓库 `unixsam/mailvod-release` 与同一份 `version.j
     │
     ├── ExoPlayer 2.18.5 播放 m3u8（防抖 headers 注入）
     │   断点续播：进度 10s 落盘，起播前定位；本地文件损坏自动切在线兜底
+    │
+    ├── 先下后播：解析清单 → AdDetector 去广告(PTS 时间轴法) → 8 线程下载
+    │   分片(断点续传) → AES-128 解密 → 二进制拼接 TS
     │
     └── Gitee 自动更新：检查 version.json → 下载 APK → MD5 校验 → 弹窗安装
 ```
@@ -126,10 +130,11 @@ TV_android_mail-m3u8-view/
 │   │   │   │               AppUpdater.kt         更新检查/下载/安装弹窗
 │   │   │   │               TlsCompat.kt          ISRG 根证书兼容
 │   │   │   ├── download/   M3u8Downloader.kt     分片下载/AES-128/TS 拼接
-│   │   │   │               MovieFiles.kt         本地文件管理
+│   │   │               AdDetector.kt         去广告检测器(PTS 时间轴法)
+│   │   │               MovieFiles.kt         本地文件管理
 │   │   │   ├── playback/   VodPlayer.kt          ExoPlayer 核心(HLS/续播/兜底)
 │   │   │   ├── store/      LibraryStore / ProgressStore / VideoItem
-│   │   │   ├── config/     Config(library_url) / ConfigLoader
+│   │   │   ├── config/     Config(library_url / update_url) / ConfigLoader
 │   │   │   └── App.kt
 │   │   ├── assets/certs/               ISRG Root X1/X2 证书（TLS 兼容）
 │   │   ├── assets/config.example.json  配置模板（仅参考，零配置也可用）
@@ -140,6 +145,7 @@ TV_android_mail-m3u8-view/
 │       └── AndroidManifest.xml        LAUNCHER + REQUEST_INSTALL_PACKAGES
 ├── build.gradle.kts                   AGP 8.5.2 / Kotlin 2.0.20 / productFlavors
 ├── design.md                          设计文档（协议/存储/UI/踩坑 全记录）
+├── remove-ad.md                       去广告算法文档（PTS 时间轴法原理与实测数据）
 └── README.md
 ```
 

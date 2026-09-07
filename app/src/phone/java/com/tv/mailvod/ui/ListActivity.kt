@@ -111,7 +111,7 @@ class ListActivity : AppCompatActivity() {
         }
     }
 
-    /** 设置对话框: 输入 Gitee 片库地址(内置默认值), 保存后刷新片库。 */
+    /** 设置对话框: 输入 APK 更新地址与片源地址(内置默认值), 保存后刷新片库。 */
     private fun showSettingsDialog() {
         val cfg = App.instance.configLoader.config
         val dp = resources.displayMetrics.density
@@ -124,7 +124,8 @@ class ListActivity : AppCompatActivity() {
             setTextColor(getColor(R.color.text_secondary))
             textSize = 13f
         }
-        val etUrl = EditText(this).apply {
+        // 框状输入框(四周描边, 替代系统下划线); 换背景后系统内边距失效, 需手动补
+        fun urlBox(preset: String) = EditText(this).apply {
             hint = "https://gitee.com/..."
             // 多行(带 MULTI_LINE 标志才有自动换行): 长地址完整显示, 不再单行横向滚动
             inputType = android.text.InputType.TYPE_CLASS_TEXT or
@@ -132,12 +133,15 @@ class ListActivity : AppCompatActivity() {
                 android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             setLines(3)
             gravity = android.view.Gravity.TOP or android.view.Gravity.START
-            setText(cfg.libraryUrl)
-            // 四周描边的框状外观(替代系统下划线); 换背景后系统内边距失效, 需手动补
+            setText(preset)
             background = androidx.core.content.ContextCompat.getDrawable(
                 this@ListActivity, R.drawable.bg_edit_box)
             setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (10 * dp).toInt())
         }
+        val etUpdateUrl = urlBox(cfg.updateUrl)
+        val etUrl = urlBox(cfg.libraryUrl)
+        layout.addView(label(getString(R.string.settings_update_hint)))
+        layout.addView(etUpdateUrl)
         layout.addView(label(getString(R.string.settings_url_hint)))
         layout.addView(etUrl)
 
@@ -145,12 +149,13 @@ class ListActivity : AppCompatActivity() {
             .setTitle(R.string.settings_title)
             .setView(layout)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                val url = etUrl.text.toString().trim()
-                if (url.isEmpty()) {
+                val updateUrl = etUpdateUrl.text.toString().trim()
+                val libUrl = etUrl.text.toString().trim()
+                if (updateUrl.isEmpty() || libUrl.isEmpty()) {
                     Toast.makeText(this, R.string.settings_url_missing, Toast.LENGTH_LONG).show()
                     return@setPositiveButton
                 }
-                App.instance.configLoader.save(cfg.copy(libraryUrl = url))
+                App.instance.configLoader.save(cfg.copy(updateUrl = updateUrl, libraryUrl = libUrl))
                 Toast.makeText(this, R.string.settings_saved, Toast.LENGTH_SHORT).show()
                 doRefresh()
             }

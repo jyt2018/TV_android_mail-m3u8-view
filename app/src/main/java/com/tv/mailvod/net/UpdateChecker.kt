@@ -10,12 +10,16 @@ import java.net.URL
 import java.security.MessageDigest
 
 /**
- * 自动更新检查：启动时后台拉取 Gitee 上的 version.json,
+ * 自动更新检查：启动时后台拉取配置地址的 version.json,
  * 若远端 versionCode 更大则下载 APK 到 cacheDir 并做 md5 校验。
  * version.json 顶层为 tv 版字段(兼容旧包), "phone" 子对象为手机版; 按 channel 取段。
  * 任何失败都静默(仅日志), 不打扰正常使用。
  */
-class UpdateChecker(private val context: Context) {
+class UpdateChecker(
+    private val context: Context,
+    /** version.json 直链(设置页可配置), 缺省内置 Gitee 地址。 */
+    private val versionUrl: String = VERSION_URL
+) {
 
     companion object {
         private const val TAG = "UpdateChecker"
@@ -74,7 +78,7 @@ class UpdateChecker(private val context: Context) {
     private fun fetchJson(channel: String): VersionInfo {
         val root = json.decodeFromString(
             kotlinx.serialization.json.JsonObject.serializer(),
-            String(httpGet(VERSION_URL), Charsets.UTF_8)
+            String(httpGet(versionUrl), Charsets.UTF_8)
         )
         val node = if (channel == CHANNEL_PHONE) {
             root["phone"] ?: throw java.io.IOException("version.json 缺少 phone 段")

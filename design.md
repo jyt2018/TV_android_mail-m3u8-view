@@ -1,9 +1,11 @@
-# MailM3U8 TV 设计文档（v0.7.6）
+# MailM3U8 TV 设计文档（v0.8.0）
 
 > TV 端「Gitee 片源清单 → 合并到本地 JSON → 列表选择 → 播放 m3u8」+ 手机版（phone flavor）
 > 状态：已实现（Gitee 收片、双端自动更新已上线、UI 打磨中）
-> 日期：2026-09-05
+> 日期：2026-09-07
 
+> **v0.8.0 变更**：「先下后播」内置去广告——归一为 PTS 时间轴法（通用唯一算法，新增 `download/AdDetector.kt`，详见 [remove-ad.md](remove-ad.md)），量子 lz-cdn 与非凡 ffzy 两源实测零误判，旧 lz 文件名算法删除；检测阶段进度「检测广告 x/y」+ 检测结果按清单指纹缓存。
+> **v0.7.7 变更**：「设置」弹窗改双输入框——APK 更新地址（version.json 直链，新增 `update_url` 配置，原硬编码改为可配置）+ 片源地址（原片库地址改名「片源」，不限 Gitee、任意公开直链 JSON 均可）；TV 端头像聚焦黄框 3dp→2dp。
 > **v0.7.6 变更**：TV 播放页 OK 键直接切换播放/暂停（`controllerAutoShow=false` + dispatchKeyEvent 分发层拦截，不再弹控制条）；手机端：关于弹窗（点左上角标题）、设置输入框多行换行 + 四周描边框状背景、列表行删除按钮移到片名行右侧（0.1.5 增大并带垃圾桶 emoji，文字规格与其它按钮一致）、播放按钮(40dp/14sp)与刷新键一致。
 > **v0.7.5 重大变更**：全面移除邮箱(IMAP)收片通道，改为 Gitee 仓库 `library.json` 片源清单（一次 HTTPS GET，零配置可用）。
 > 历史邮件方案的全部设计/坑记录保留在 §2/§7 作留底。
@@ -29,7 +31,7 @@
 
 ## 2. 片源清单协议（Gitee library.json）
 
-片源以 JSON 数组放在 Gitee 公开仓库 `unixsam/mailvod-release` 的 `library.json`（与 version.json/APK 同仓库）。应用按 config.json 的 `library_url`（raw 直链，默认指向该文件）拉取。
+片源以 JSON 数组放在 Gitee 公开仓库 `unixsam/mailvod-release` 的 `library.json`（与 version.json/APK 同仓库）。应用按 config.json 的 `library_url`（直链，默认指向该文件）拉取。**托管平台不限 Gitee**：LibrarySync 就是一次普通 HTTPS GET + JSON 解析（无令牌/无域名校验），任何公开可访问、返回该 JSON 的地址（自建服务器 / 局域网 HTTP / 对象存储等）均可，在设置页改「片源地址」即可；唯一约束是无登录、无特殊请求头、证书能被老电视信任。
 
 > 历史方案（0.7.4 及以前）：邮件主题 `m3u8_view` + 正文 JSON（`**********` 分隔符）或 `.json` 附件，
 > 自写 IMAP 单连接 + MIME 多级解码。0.7.5 起移除，完整设计见 git 历史与 §7 坑表。
@@ -68,12 +70,14 @@
 ## 3. 配置文件 config.json
 
 位置：应用私有目录 `/data/data/<包名>/files/config.json`。
-**零配置可用**：文件不存在或损坏时全部走默认值；「设置」按钮可改 `library_url`。旧版本遗留的 `mail` 段会被 ignoreUnknownKeys 忽略，不影响读取。
+**零配置可用**：文件不存在或损坏时全部走默认值；「设置」按钮可改 `library_url`（片源）与 `update_url`（APK 更新）。旧版本遗留的 `mail` 段会被 ignoreUnknownKeys 忽略，不影响读取。
 
 ```jsonc
 {
   "library_url": "https://gitee.com/unixsam/mailvod-release/raw/master/library.json",
-                                   // 片源清单地址, 设置页可改
+                                   // 片源清单地址, 设置页可改(不限 Gitee)
+  "update_url": "https://gitee.com/unixsam/mailvod-release/raw/master/version.json",
+                                   // APK 更新检查地址, 设置页可改(0.7.7 新增, 缺省同仓库)
   "list_columns": ["title", "country", "type", "year", "director"],
                                    // 列表每行显示哪些字段,顺序即显示顺序
                                    // 可选值: title, country, type, year, director, actors, episode
@@ -116,7 +120,7 @@
 | **片库页** | `ListActivity` / activity_list | 主页影片列表, 打开 app 即此页 |
 | **播放页** | `PlayerActivity` / activity_player | 在线 HLS 或本地 ts 播放, 头部显示片名 |
 | **搜索页** | `SearchActivity` / activity_search | 界面壳(v0.6.4 设计, 逻辑未实现): 左上角 ← 返回按钮(遥控器返回键等效) + 搜索框 + 搜索按钮 + 结果列表 |
-| **设置弹窗** | 片库页内 `AlertDialog` / dialog_settings | 输入邮箱账号 + 授权码, 确定后写入 config.json (v0.6.4) |
+| **设置弹窗** | 片库页内 `AlertDialog` / dialog_settings | 双输入框: APK 更新地址 + 片源地址, 确定后写入 config.json (v0.7.7 起; 原单框片库地址) |
 | **关于弹窗** | 片库页内 `AlertDialog` | 片库页头像图标点击触发: 版本 / 开发者 / 操作使用说明 (v0.6.4) |
 | **下载弹窗** | 片库页内 `AlertDialog` / dialog_download | 先下后播的进度弹窗 (解析→下载分片 x/y→拼接 TS) |
 | **删除确认弹窗** | 片库页内 `AlertDialog` | 确认文案 + 复选框"同时删除已下载内容"(默认勾选) |
@@ -137,7 +141,7 @@
 ```
 
 - **标题行**（v0.6.4 重排）：左起为博美头像图标 + 标题 + 小字版本号 + 弹性空白 + 菜单提示 + 刷新/设置/搜索三按钮
-  - **头像图标** `ivIcon`（48dp）：`drawable-*/ic_head.png`，由 `songsong-head.png` 抠白底生成透明背景（脚本 `_tmp/make_head_icon.py`，水印遮盖 + 四角 BFS 清近白连通区 + 边缘细化）。可聚焦，聚焦时黄框（`bg_icon_focus`：3dp #FFD700 12dp 圆角描边）；OK 点击弹**关于弹窗**（版本 v x.y.z(code) / 开发者 jyt2018 / 6 条操作说明）
+  - **头像图标** `ivIcon`（48dp）：`drawable-*/ic_head.png`，由 `songsong-head.png` 抠白底生成透明背景（脚本 `_tmp/make_head_icon.py`，水印遮盖 + 四角 BFS 清近白连通区 + 边缘细化）。可聚焦，聚焦时黄框（`bg_icon_focus`：2dp #FFD700 12dp 圆角描边, v0.7.7 由 3dp 调细）；OK 点击弹**关于弹窗**（版本 v x.y.z(code) / 开发者 jyt2018 / 6 条操作说明）
   - **版本号**：紧跟标题后小字体（14sp 灰），格式 `v 0.6.4`（v 后带空格），动态读 PackageInfo
   - **三按钮等宽**（v0.6.4）：刷新🔄 / 设置⚙️ / 搜索🔎，统一 84dp 宽、文字居中、间距 12dp
   - **设置⚙️**：弹窗预填当前账号/授权码，确定后 `ConfigLoader.save()` 写 `files/config.json`（重启/刷新生效）
@@ -204,16 +208,19 @@
 
 四个行内按钮（在线播放/先下后播/本地播放/删除）统一：`bg_btn_selector` 背景，`minWidth=0dp minHeight=0dp`（Android Button 默认有 ~48dp minWidth，必须显式设 0 才能缩小），`padding 10dp / 4dp`（横向/纵向），`textSize=14sp`。宽度固定：在线播放/先下后播(本地播放) 84dp（4 字文案），删除 56dp；刷新按钮 `wrap_content`。
 
-标题栏三按钮（v0.6.4）：刷新🔄 / 设置⚙️ / 搜索🔎 统一 **84dp 等宽 + gravity 居中**，间距 12dp，同样是 `bg_btn_selector` + `minWidth/minHeight=0dp`。头像图标聚焦态用独立的 `bg_icon_focus`（透明底 + 3dp 黄描边），与按钮的蓝色填充背景区分。
+标题栏三按钮（v0.6.4）：刷新🔄 / 设置⚙️ / 搜索🔎 统一 **84dp 等宽 + gravity 居中**，间距 12dp，同样是 `bg_btn_selector` + `minWidth/minHeight=0dp`。头像图标聚焦态用独立的 `bg_icon_focus`（透明底 + 2dp 黄描边, v0.7.7 由 3dp 调细），与按钮的蓝色填充背景区分。
 
 ### 5.5 先下后播 / 本地播放（v0.6.x）
 
 **引擎**：`download/M3u8Downloader.kt`，移植自 `H:\downmovie\script\m3u8_download.py`。
 
-- 流程：获取 m3u8（master→子列表）→ 量子源(lz) 广告检测/校验/去除（>6 组或 >30% 判误判跳过）→ 8 线程下载分片（重试 5 次、断点续传、AES-128 解密）→ 二进制拼接 TS → 重命名为 `编号.ts` 播放
+- 流程：获取 m3u8（master→子列表）→ **广告检测/去除（v0.8.0 起 PTS 时间轴法，通用唯一算法，`download/AdDetector.kt`）** → 8 线程下载分片（重试 5 次、断点续传、AES-128 解密）→ 二进制拼接 TS → 重命名为 `编号.ts` 播放
 - **不重封装 MP4**（v0.6.2 定案）：曾用 MediaExtractor/MediaMuxer 替代 ffmpeg，但慢（2GB 数分钟）且容错差易出半成品，ExoPlayer 原生支持 MPEG-TS，直接播 TS
 - 产物位置：`Android/data/com.tv.mailvod/files/movies/编号.ts`；临时分片在 `编号_tmp/`，成功后清理
-- 下载弹窗进度：解析（流动条）→ 下载分片 x/y（真实百分比）→ 拼接 TS（流动条）；取消/返回即 cancel
+- **去广告原理（PTS 时间轴法，2026-09-07 实测定稿）**：清单以 `#EXT-X-DISCONTINUITY` 把正片切成组，广告以整组硬拼接，其 PTS（展示时间戳）脱离内容时间轴而正片各组严格连续。检测 = HTTP Range 抓每组首分片头部 64KB（8 线程并发、失败重试 3 次），解析首个 PES 的 PTS，沿清单累计时长推进预期起点，命中（容差 2 秒）判正片、脱轨判广告。量子 lz-cdn 与非凡 ffzy 两源实测与旧文件名法判定完全一致（lz：末日激战 3 块×26 秒；ffzy：3 块共 56.6 秒，零误判），故 v0.8.0 归一删除旧 lz 文件名算法
+- **去广告护栏**（任一超限视为误判，放弃剔除按原样下载）：广告块 ≤5；单块 ≤4 组且 ≤120 秒；广告总时长 ≤15%；扫描失败组按正片保留（部分剔除，宁多勿缺）
+- **检测结果缓存**：按清单内容 SHA-256 指纹存 `movies/adcache/ad_指纹前16.json`（广告组号数组），同清单重下免扫描；清单内容变化指纹变，自动失效
+- 下载弹窗进度：解析（流动条）→ 检测广告 x/y（首扫约 1~2 分钟，命中缓存则瞬间跳过）→ 下载分片 x/y（真实百分比）→ 拼接 TS（流动条）；取消/返回即 cancel
 - **本地播放失败自动切在线**（兜底）：PlayerActivity 收 `EXTRA_FALLBACK_URL`，本地源报错时自动改播 HLS 在线流
 - **删除条目**：删除确认弹窗勾选"同时删除已下载内容"（默认勾选）→ 连带删除 `编号.ts`/残留 `编号.mp4`/`编号_tmp/`
 - 教训：重封装失败分支必须删除半成品 MP4，否则下次被当有效文件播放报 source error（0006 案例）
@@ -272,6 +279,7 @@ app/src/
 │   ├── java/com/tv/mailvod/
 │   │   ├── net/LibrarySync.kt         Gitee 片库地址 GET + 投递 JSON 解析(0.7.5 取代 mail/)
 │   │   ├── download/M3u8Downloader.kt m3u8 解析/分片下载/AES-128/TS 拼接
+│   │   ├── download/AdDetector.kt     去广告检测器(PTS 时间轴法, 通用唯一算法, 详见 remove-ad.md)
 │   │   ├── download/MovieFiles.kt     movies/ 本地文件管理(下载集/删除/定位, 2026-09-04 抽取共用)
 │   │   ├── playback/VodPlayer.kt      ExoPlayer 核心(HLS/headers/断点续播/本地兜底, 2026-09-04 抽取共用)
 │   │   ├── store/                     LibraryStore / ProgressStore / VideoItem
@@ -284,7 +292,7 @@ app/src/
 ├── tv/                            TV 版专属(2026-09-04 flavor 化)
 │   ├── java/com/tv/mailvod/ui/        ListActivity(遥控器) / VideoAdapter(焦点) /
 │   │                                  PlayerActivity(按键壳) / SearchActivity
-│   ├── res/                           TV 布局/焦点 drawable/Theme.Leanback 主题/ic_head/ic_banner/dialog_settings(片库地址)
+│   ├── res/                           TV 布局/焦点 drawable/Theme.Leanback 主题/ic_head/ic_banner/dialog_settings(APK更新+片源地址)
 │   └── AndroidManifest.xml            leanback + banner + LEANBACK_LAUNCHER + REQUEST_INSTALL_PACKAGES
 └── phone/                         手机版专属(2026-09-04 新增)
     ├── java/com/tv/mailvod/ui/        ListActivity(触屏) / VideoAdapter / PlayerActivity(触控条壳)
@@ -295,7 +303,7 @@ app/src/
 技术栈：Kotlin + RecyclerView + ExoPlayer 2.18.5 + OkHttp 4.9.3 + kotlinx.serialization（0.7.5 移除 android-mail）。
 
 minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug 签名）：
-- `gradle assembleTvDebug` → `app/build/outputs/apk/tv/debug/app-tv-debug.apk`（com.tv.mailvod，0.7.6 / 40）
+- `gradle assembleTvDebug` → `app/build/outputs/apk/tv/debug/app-tv-debug.apk`（com.tv.mailvod，0.7.7 / 41）
 - `gradle assemblePhoneDebug` → `app/build/outputs/apk/phone/debug/app-phone-debug.apk`（com.mailvod.phone，0.1.5 / 6）
 - leanback 依赖仅 `tvImplementation`（手机包不携带）；versionCode/Name 定义在 build.gradle.kts 的 productFlavors 内，各版本独立演进
 
@@ -319,9 +327,9 @@ minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug �
 | 表头表体列对齐 | OK（共用 buildColumnLayoutParams + 按钮占位） |
 | 按钮尺寸缩小 | OK（minWidth=0dp + padding 10/4） |
 | 标题行显示 [头像] 松松看片 (共x) v 0.6.4 + 刷新🔄/设置⚙️/搜索🔎 三等宽按钮 | OK（v0.6.4） |
-| 头像透明背景 PNG；遥控器焦点移上出现黄框 | OK（bg_icon_focus 3dp 黄描边） |
+| 头像透明背景 PNG；遥控器焦点移上出现黄框 | OK（bg_icon_focus 2dp 黄描边） |
 | OK 点头像 → 关于弹窗（版本/开发者/操作说明），OK 或返回关闭 | OK |
-| 设置⚙️ → 弹窗预填片库地址（默认 Gitee 直链），修改确定后 config.json 更新 | OK（ConfigLoader.save） |
+| 设置⚙️ → 弹窗预填 APK 更新地址与片源地址（默认内置，均可在设置页修改），确定后 config.json 更新 | OK（ConfigLoader.save） |
 | 搜索🔎 → 进入搜索页；返回按钮 / 遥控器返回键回片库页 | OK（搜索逻辑未实现，点搜索提示开发中） |
 
 ---
@@ -357,13 +365,13 @@ minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug �
 | 维度 | TV 版 | 手机版 |
 |---|---|---|
 | 包名 | com.tv.mailvod | com.mailvod.phone（可共存/并行调试） |
-| 版本 | 0.7.6 / 40 独立演进 | 0.1.5 / 6 独立演进 |
+| 版本 | 0.7.7 / 41 独立演进 | 0.1.6 / 7 独立演进 |
 | 入口 | LEANBACK_LAUNCHER + LAUNCHER | 仅 LAUNCHER |
 | 主题 | Theme.Leanback 系 | Theme.AppCompat.NoActionBar 系（同深色配色） |
 | 播放交互 | 遥控器 OK=播放/暂停直接切换(0.7.6 起不弹控制条, dispatchKeyEvent 拦截), 左右 ±10s, 返回=二次确认退出 | ExoPlayer 默认触控条, 默认横屏(sensorLandscape), 返回直接退出 |
 | 列表交互 | D-pad 焦点高亮 + 表头表格 | 卡片行(标题/元信息/已下载标签/删除键靠右与片名同行, 0.1.5 起带垃圾桶 emoji 与其它键同规格) + 按钮行(播放/先下后播, 与刷新键同规格) |
 | 关于弹窗 | 点头像图标弹出 | 点左上角标题「松松看片」弹出(0.1.4 起) |
-| 设置弹窗 | dialog_settings 布局(片库地址) | 代码构建布局(片库地址, 0.1.5 起 3 行自动换行 + 四周描边框状背景 bg_edit_box) |
+| 设置弹窗 | dialog_settings 布局(APK更新+片源地址) | 代码构建布局(双地址框, 0.1.5 起 3 行自动换行 + 四周描边框状背景 bg_edit_box) |
 | 自动更新 | 有(REQUEST_INSTALL_PACKAGES) | 有(0.1.1 起, 同权限) |
 | 搜索页 | 界面壳已实现 | MVP 无，后续补 |
 

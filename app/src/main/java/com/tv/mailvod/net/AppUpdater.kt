@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
+import com.tv.mailvod.App
 import com.tv.mailvod.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -29,7 +30,9 @@ class AppUpdater(
             .putLong("last_check", System.currentTimeMillis()).apply()
         if (manual) Toast.makeText(activity, R.string.update_checking, Toast.LENGTH_SHORT).show()
         activity.lifecycleScope.launch {
-            val checker = UpdateChecker(activity.applicationContext)
+            // 每次检查现读 config(设置页可改 update_url), 无需构造时传入
+            val checker = UpdateChecker(activity.applicationContext,
+                App.instance.configLoader.config.updateUrl)
             val info = withContext(Dispatchers.IO) { checker.fetchRemoteVersion(channel) }
             if (info == null) {
                 if (manual) Toast.makeText(activity, R.string.update_check_fail,

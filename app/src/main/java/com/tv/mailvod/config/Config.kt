@@ -9,9 +9,12 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class Config(
-    /** 片库地址(Gitee 仓库 library.json 的 raw 直链), 设置页可改。 */
+    /** 片源地址(library.json 直链, 不限托管平台), 设置页可改。 */
     @SerialName("library_url")
     val libraryUrl: String = "https://gitee.com/unixsam/mailvod-release/raw/master/library.json",
+    /** APK 更新检查地址(version.json 直链), 设置页可改; 缺省与片源同仓库。 */
+    @SerialName("update_url")
+    val updateUrl: String = "https://gitee.com/unixsam/mailvod-release/raw/master/version.json",
     @SerialName("list_columns")
     val listColumns: List<String> = listOf("title", "episode", "year", "director"),
     val player: Player = Player()

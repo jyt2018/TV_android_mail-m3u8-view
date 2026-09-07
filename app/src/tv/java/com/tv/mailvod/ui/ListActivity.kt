@@ -180,22 +180,25 @@ class ListActivity : ComponentActivity() {
             .show()
     }
 
-    /** 设置弹窗: 输入 Gitee 片库地址(默认值内置), 确定后写入 config.json。 */
+    /** 设置弹窗: 输入 APK 更新地址与片源地址(默认值内置), 确定后写入 config.json。 */
     private fun showSettingsDialog() {
         val cfg = App.instance.configLoader.config
         val view = layoutInflater.inflate(R.layout.dialog_settings, null)
+        val etUpdateUrl = view.findViewById<android.widget.EditText>(R.id.etUpdateUrl)
         val etUrl = view.findViewById<android.widget.EditText>(R.id.etUrl)
+        etUpdateUrl.setText(cfg.updateUrl)
         etUrl.setText(cfg.libraryUrl)
         AlertDialog.Builder(this)
             .setTitle(R.string.settings_title)
             .setView(view)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                val url = etUrl.text.toString().trim()
-                if (url.isEmpty()) {
+                val updateUrl = etUpdateUrl.text.toString().trim()
+                val libUrl = etUrl.text.toString().trim()
+                if (updateUrl.isEmpty() || libUrl.isEmpty()) {
                     Toast.makeText(this, R.string.settings_url_missing, Toast.LENGTH_LONG).show()
                     return@setPositiveButton
                 }
-                App.instance.configLoader.save(cfg.copy(libraryUrl = url))
+                App.instance.configLoader.save(cfg.copy(updateUrl = updateUrl, libraryUrl = libUrl))
                 Toast.makeText(this, R.string.settings_saved, Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton(android.R.string.cancel, null)

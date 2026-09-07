@@ -1,5 +1,6 @@
 {
   "library_url": "https://gitee.com/unixsam/mailvod-release/raw/master/library.json",
+  "update_url": "https://gitee.com/unixsam/mailvod-release/raw/master/version.json",
   "list_columns": ["title", "country", "type", "year", "director"],
   "player": {
     "auto_next": false

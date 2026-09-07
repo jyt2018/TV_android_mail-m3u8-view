@@ -17,9 +17,10 @@
     <string name="action_settings">设置</string>
     <string name="action_search">搜索</string>
     <string name="action_back">← 返回</string>
-    <string name="settings_title">片库设置</string>
-    <string name="settings_url_hint">Gitee 片库地址</string>
-    <string name="settings_url_missing">片库地址不能为空</string>
+    <string name="settings_title">设置</string>
+    <string name="settings_update_hint">APK 更新地址</string>
+    <string name="settings_url_hint">片源地址</string>
+    <string name="settings_url_missing">地址不能为空</string>
     <string name="settings_saved">设置已保存</string>
     <string name="search_hint">输入片名关键词</string>
     <string name="search_btn">搜索</string>
@@ -28,7 +29,7 @@
     <string name="want_watch">想看</string>
     <string name="about_title">关于 松松看片</string>
     <string name="about_developer">开发者：jyt2018</string>
-    <string name="about_usage">操作说明：\n1. 上下键选片，OK 键播放在线视频\n2. 行内左右移动可选【先下后播】【删除】\n3. 遥控器菜单键 = 刷新片库\n4. 设置：配置 Gitee 片库地址（默认已填好）\n5. 搜索：全网找片（开发中）\n6. 片源：Gitee 仓库 library.json 片源清单，按刷新即入库</string>
+    <string name="about_usage">操作说明：\n1. 上下键选片，OK 键播放在线视频\n2. 行内左右移动可选【先下后播】【删除】\n3. 遥控器菜单键 = 刷新片库\n4. 设置：配置 APK 更新地址与片源地址（默认已填好，不限 Gitee）\n5. 搜索：全网找片（开发中）\n6. 片源：公开直链 JSON 清单，按刷新即入库</string>
     <string name="empty_hint">暂无影片。按刷新键从片库地址拉取。</string>
     <string name="confirm_delete">已看过？删除该条目</string>
     <string name="confirm_ok">再按 OK 确认删除 / 返回取消</string>
