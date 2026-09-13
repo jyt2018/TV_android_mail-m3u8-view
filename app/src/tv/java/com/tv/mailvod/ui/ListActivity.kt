@@ -13,10 +13,12 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.tv.mailvod.App
 import com.tv.mailvod.R
 import com.tv.mailvod.databinding.ActivityListBinding
 import com.tv.mailvod.download.M3u8Downloader
+import com.tv.mailvod.download.MovieFiles
 import com.tv.mailvod.net.LibrarySync
 import com.tv.mailvod.store.ProgressStore
 import com.tv.mailvod.store.VideoItem
@@ -24,13 +26,14 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 /**
- * 列表页（唯一主页面）。
+ * 列表页（唯一主页面, 片库页）。
  * - onResume 加载 library.json 并显示
  * - 刷新键：Gitee 片库地址拉取 → 合并 → 刷新列表
  * - 行播放键：跳转 PlayerActivity（传 url + headers）
  * - 行删除键：系统 AlertDialog 二次确认 → 删除并刷新
  *
- * 遥控器焦点由 RecyclerView 视图树自然处理：上下行间、右进播放/删除键、到底部刷新键。
+ * 遥控器焦点：行根(rowRoot)可聚焦, 上下键在行间移动并定向默认按钮
+ * (已下载行→本地播放, 未下载行→在线播放)；左右键行内走按钮。
  */
 class ListActivity : ComponentActivity() {
 
@@ -64,8 +67,7 @@ class ListActivity : ComponentActivity() {
 
         // 动态填充表头字段名 (调用 VideoAdapter.buildColumnLayoutParams → 与表体列宽完全一致)
         val fieldLabelMap = mapOf(
-            "title" to "标题",
-            "episode" to "集",
+            "title" to "片名",
             "year" to "年份",
             "country" to "国家",
             "type" to "类型",
@@ -86,9 +88,11 @@ class ListActivity : ComponentActivity() {
             binding.llHeaderFields.addView(tv)
         }
 
-        // 全局焦点监听: 焦点跳出 RecyclerView 时,清除所有行高亮
-        // (rowRoot 不可聚焦, 焦点落在行内按钮上, 需沿 parent 链判断是否 RV 后代)
-        binding.rvList.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
+        // 全局焦点监听:
+        // 1) 焦点跳出 RecyclerView → 清除所有行高亮
+        // 2) 焦点落在行根(rowRoot 可聚焦) → 默认按钮定向: 已下载行落"本地播放", 未下载落"在线播放"
+        //    (从本行按钮移出来的则不重定向, 停在行根, 让用户下一次左右键继续走行内按钮)
+        binding.rvList.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
             val rv = binding.rvList
             val inRv = if (newFocus == null) false else run {
                 var p = newFocus.parent
@@ -97,6 +101,18 @@ class ListActivity : ComponentActivity() {
             }
             if (!inRv) {
                 adapter.setHighlight(rv, -1)
+                return@addOnGlobalFocusChangeListener
+            }
+            if (newFocus.id == R.id.rowRoot) {
+                val pos = rv.getChildAdapterPosition(newFocus)
+                if (pos == RecyclerView.NO_POSITION) {
+                    return@addOnGlobalFocusChangeListener
+                }
+                if (oldFocus != null && oldFocus.parent === newFocus) {
+                    adapter.setHighlight(rv, pos)
+                } else {
+                    adapter.focusPreferred(rv, pos)
+                }
             }
         }
 
@@ -116,6 +132,44 @@ class ListActivity : ComponentActivity() {
         loadList()
         // 自动检查更新(TV 上按返回退出进程常驻, onCreate 不再重跑 → 挪到 onResume + 30 分钟节流)
         if (updater.shouldAutoCheck()) updater.check(manual = false)
+    }
+
+    /** 遥控器按键定制: 上下键强制行间路由(已下载行默认落"本地播放"), 不依赖系统焦点搜索。 */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_DOWN -> if (moveRowFocus(+1)) return true
+                KeyEvent.KEYCODE_DPAD_UP -> if (moveRowFocus(-1)) return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    /**
+     * 上下键移动行焦点: 计算当前行 ±1, 滚动到位后把焦点交给该行默认按钮 (已下载 → 本地播放)。
+     * 返回 false 表示不拦截 (焦点不在列表内 / 首行再向上 → 交给默认焦点引擎去表头)。
+     * 焦点不在 rvList 子树时 parent 链会走到 DecorView → ViewRootImpl(非 View), 必须在强转前判型返回,
+     * 否则 ClassCastException 闪退 (0.8.7 修复: 焦点在标题栏按钮上按上下键即崩)。
+     */
+    private fun moveRowFocus(dir: Int): Boolean {
+        val rv = binding.rvList
+        val focused = currentFocus ?: return false
+        var child = focused
+        var p: android.view.ViewParent? = child.parent
+        while (p != null && p !== rv) {
+            if (p !is View) return false
+            child = p
+            p = child.parent
+        }
+        if (p !== rv) return false
+        val pos = rv.getChildAdapterPosition(child)
+        if (pos == RecyclerView.NO_POSITION) return false
+        val target = pos + dir
+        if (target < 0) return false
+        if (target >= adapter.itemCount) return true
+        rv.scrollToPosition(target)
+        rv.post { adapter.focusPreferred(rv, target) }
+        return true
     }
 
     /** 遥控器菜单键(KEYCODE_MENU=82) = 刷新。 */
@@ -165,20 +219,35 @@ class ListActivity : ComponentActivity() {
         }
     }
 
-    /** 关于弹窗: 版本、开发者、操作使用说明。 */
+    /** 关于弹窗: 版本、下载统计(已下载部数/占用/剩余空间)、操作说明。 */
     private fun showAboutDialog() {
         val info = packageManager.getPackageInfo(packageName, 0)
-        val message = getString(R.string.about_developer) +
-            "\n版本: v " + info.versionName + " (" + info.versionCode + ")" +
-            "\n\n" + getString(R.string.about_usage)
-        AlertDialog.Builder(this)
-            .setTitle(R.string.about_title)
-            .setIcon(R.drawable.ic_head)
-            .setMessage(message)
-            .setPositiveButton(android.R.string.ok, null)
-            .setNeutralButton(R.string.update_check) { _, _ -> updater.check(manual = true) }
-            .show()
+        lifecycleScope.launch {
+            val items = App.instance.library.load()
+            val ids = MovieFiles.downloadedKeys(this@ListActivity)
+            val titles = items.filter { MovieFiles.keyOf(it.title) in ids }.map { it.title }.toSortedSet()
+            val dir = MovieFiles.dir(this@ListActivity)
+            val usedBytes = dir.walkBottomUp().filter { it.isFile }.sumOf { it.length() }
+            val freeBytes = dir.freeSpace
+            val message = getString(R.string.about_developer) +
+                "\n版本: v " + info.versionName + " (" + info.versionCode + ")" +
+                "\n" + getString(R.string.about_downloaded, titles.size) +
+                "\n" + getString(R.string.about_used, fmtGb(usedBytes)) +
+                "\n" + getString(R.string.about_free, fmtGb(freeBytes)) +
+                "\n\n" + getString(R.string.about_usage)
+            AlertDialog.Builder(this@ListActivity)
+                .setTitle(R.string.about_title)
+                .setIcon(R.drawable.ic_head)
+                .setMessage(message)
+                .setPositiveButton(android.R.string.ok, null)
+                .setNeutralButton(R.string.update_check) { _, _ -> updater.check(manual = true) }
+                .show()
+        }
     }
+
+    /** 字节转 GB 字符串, 两位小数。 */
+    private fun fmtGb(bytes: Long): String =
+        String.format(java.util.Locale.US, "%.2f", bytes / 1073741824.0)
 
     /** 设置弹窗: 输入 APK 更新地址与片源地址(默认值内置), 确定后写入 config.json。 */
     private fun showSettingsDialog() {
@@ -211,8 +280,7 @@ class ListActivity : ComponentActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding((24 * dp).toInt(), (16 * dp).toInt(), (24 * dp).toInt(), 0)
             addView(TextView(this@ListActivity).apply {
-                text = getString(R.string.confirm_ok) + "\n\n" + item.title +
-                    if (item.episode > 0) " E${item.episode}" else ""
+                text = getString(R.string.confirm_ok) + "\n\n" + item.title
             })
             addView(CheckBox(this@ListActivity).apply {
                 text = getString(R.string.dl_del_also)
@@ -226,10 +294,10 @@ class ListActivity : ComponentActivity() {
             .setPositiveButton(R.string.action_delete) { _, _ ->
                 val alsoFiles = wrap.getChildAt(1) as CheckBox
                 lifecycleScope.launch {
-                    App.instance.library.delete(item.id)
-                    App.instance.progress.remove(ProgressStore.keyOf(item.title, item.episode))
+                    App.instance.library.delete(item.title)
+                    App.instance.progress.remove(ProgressStore.keyOf(item.title))
                     if (alsoFiles.isChecked) {
-                        com.tv.mailvod.download.MovieFiles.deleteLocalFiles(this@ListActivity, item.displayId)
+                        MovieFiles.deleteLocalFiles(this@ListActivity, item.title)
                     }
                     loadList()
                 }
@@ -240,13 +308,22 @@ class ListActivity : ComponentActivity() {
         dlg.getButton(AlertDialog.BUTTON_POSITIVE).requestFocus()
     }
 
-    /** 删除条目对应的本地文件 (编号.ts/mp4 + 临时分片目录)。共用 MovieFiles。 */
+    /** 删除条目对应的本地文件 (片名.ts/mp4 + 临时分片目录)。共用 MovieFiles。 */
+
+    /** 页眉小字元信息: 片名(年份/国家), 缺项自动省略。 */
+    private fun metaOf(item: VideoItem): String {
+        val parts = listOfNotNull(
+            item.year?.takeIf { it > 0 }?.toString(),
+            item.country?.trim()?.takeIf { it.isNotEmpty() && it != "-" }
+        )
+        return if (parts.isEmpty()) item.title else "${item.title} (${parts.joinToString("/")})"
+    }
 
     private fun startPlayer(item: VideoItem) {
         val intent = Intent(this, PlayerActivity::class.java).apply {
             putExtra(PlayerActivity.EXTRA_URL, item.url)
-            putExtra(PlayerActivity.EXTRA_TITLE,
-                item.title + if (item.episode > 0) " E${item.episode}" else "")
+            putExtra(PlayerActivity.EXTRA_TITLE, item.title)
+            putExtra(PlayerActivity.EXTRA_META, metaOf(item))
             // headers 用 String[] 传递（keys/values 平行）
             val headers = item.headers
             putExtra(PlayerActivity.EXTRA_HEADER_KEYS, headers.keys.toTypedArray())
@@ -255,7 +332,7 @@ class ListActivity : ComponentActivity() {
         startActivity(intent)
     }
 
-    /** "先下后播": 已下载直接播放, 否则弹进度窗下载 → 合并 MP4(编号.mp4) → 播放本地文件。 */
+    /** "先下后播": 已下载直接播放, 否则弹进度窗下载 → 拼接 TS(片名.ts) → 播放本地文件。 */
     private fun downloadThenPlay(item: VideoItem) {
         localFileFor(item)?.let {
             Toast.makeText(this, R.string.dl_exists, Toast.LENGTH_SHORT).show()
@@ -269,7 +346,7 @@ class ListActivity : ComponentActivity() {
         val tvDetail = view.findViewById<TextView>(R.id.tvDetail)
         val pb = view.findViewById<ProgressBar>(R.id.pbDownload)
         tvStatus.text = getString(R.string.dl_stage_parse)
-        tvDetail.text = item.title + if (item.episode > 0) " E${item.episode}" else ""
+        tvDetail.text = item.title
         val dlg = AlertDialog.Builder(this)
             .setTitle(R.string.dl_title)
             .setView(view)
@@ -281,8 +358,8 @@ class ListActivity : ComponentActivity() {
         downloader = M3u8Downloader(
             m3u8Url = item.url,
             headers = item.headers,
-            workDir = File(dir, "${item.displayId}_tmp"),
-            outFile = File(dir, "${item.displayId}.ts"),
+            workDir = MovieFiles.tmpDir(this, item),
+            outFile = MovieFiles.outFile(this, item),
             listener = object : M3u8Downloader.Listener {
                 override fun onProgress(stage: String, percent: Int, indeterminate: Boolean) =
                     runOnUiThread {
@@ -309,11 +386,11 @@ class ListActivity : ComponentActivity() {
 
     /** 本地影片目录 (app 外部私有目录 movies/)。共用 MovieFiles。 */
 
-    /** 已下载条目 (编号.ts 拼接产物) 的 displayId 集合。 */
+    /** 已下载条目 (片名.ts 拼接产物) 的基名集合。 */
     private fun downloadedIds(): Set<String> =
-        com.tv.mailvod.download.MovieFiles.downloadedIds(this)
+        MovieFiles.downloadedKeys(this)
 
-    /** 条目对应的本地播放文件 (编号.ts), 无则 null。 */
+    /** 条目对应的本地播放文件 (片名.ts), 无则 null。 */
     private fun localFileFor(item: VideoItem): File? =
         com.tv.mailvod.download.MovieFiles.localFileFor(this, item)
 
@@ -322,8 +399,8 @@ class ListActivity : ComponentActivity() {
         val intent = Intent(this, PlayerActivity::class.java).apply {
             putExtra(PlayerActivity.EXTRA_URL, file.absolutePath)
             putExtra(PlayerActivity.EXTRA_FALLBACK_URL, item.url)
-            putExtra(PlayerActivity.EXTRA_TITLE,
-                item.title + if (item.episode > 0) " E${item.episode}" else "")
+            putExtra(PlayerActivity.EXTRA_TITLE, item.title)
+            putExtra(PlayerActivity.EXTRA_META, metaOf(item))
             putExtra(PlayerActivity.EXTRA_HEADER_KEYS, item.headers.keys.toTypedArray())
             putExtra(PlayerActivity.EXTRA_HEADER_VALS, item.headers.values.toTypedArray())
         }

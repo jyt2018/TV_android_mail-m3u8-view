@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 弹窗按钮默认态: 深色填充 + 细描边, 明确呈"按钮"而非纯文本; 聚焦态走 btn_focused (蓝底) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/btn_normal_bg" />
+    <stroke
+        android:width="1dp"
+        android:color="#66FFFFFF" />
+    <corners android:radius="4dp" />
+</shape>

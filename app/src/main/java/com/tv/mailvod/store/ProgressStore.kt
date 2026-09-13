@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 import java.io.File
 
 /**
- * 本地播放进度存取: files/progress.json, key = 片名(+集数)。
+ * 本地播放进度存取: files/progress.json, key = 片名。
  * 与 library.json 解耦 — 片库 merge/重建不影响进度; 覆盖安装保留, 卸载才清。
  * 看完(>=98% 或剩余<30s)的条目自动清除, 下次从头播。
  */
@@ -20,10 +20,9 @@ class ProgressStore(context: Context) {
     private val json = Json { ignoreUnknownKeys = true }
     private val file = File(context.filesDir, "progress.json")
 
-    /** 进度条目 key: 片名(+ " E集数")。与 PlayerActivity.EXTRA_TITLE 的构造保持一致。 */
+    /** 进度条目 key: 片名。与 PlayerActivity.EXTRA_TITLE 的构造保持一致。 */
     companion object {
-        fun keyOf(title: String, episode: Int): String =
-            title + if (episode > 0) " E$episode" else ""
+        fun keyOf(title: String): String = title
 
         /** 是否视为看完。durationMs<=0 (未知) 时不算。 */
         fun isFinished(positionMs: Long, durationMs: Long): Boolean =

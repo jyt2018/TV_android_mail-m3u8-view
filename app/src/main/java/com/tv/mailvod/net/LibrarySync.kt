@@ -16,7 +16,7 @@ import java.net.URL
 
 /**
  * Gitee 片库同步: 从配置的片库地址(默认 Gitee 仓库 raw 直链)拉取投递格式 JSON,
- * 解析成条目后交由 LibraryStore.merge 幂等合并(title+episode 唯一键)。
+ * 解析成条目后交由 LibraryStore.merge 幂等合并(title 唯一键)。
  * 取代旧邮件(IMAP)通道 - 无登录/无凭据/无 MIME 解析, 仅一次 HTTPS GET。
  */
 class LibrarySync {
@@ -81,9 +81,7 @@ class LibrarySync {
         val url = obj["url"]?.jsonPrimitive?.contentOrNull?.trim()
         if (title.isNullOrBlank() || url.isNullOrBlank()) return null
         return VideoItem(
-            id = 0,
             title = title,
-            episode = obj["episode"]?.jsonPrimitive?.intOrNull ?: 0,
             year = obj["year"]?.jsonPrimitive?.intOrNull,
             country = obj["country"]?.jsonPrimitive?.contentOrNull,
             type = obj["type"]?.jsonPrimitive?.contentOrNull,

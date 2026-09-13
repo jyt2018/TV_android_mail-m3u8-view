@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">松松看片</string>
-    <string name="col_num">编号</string>
     <string name="action_play">在线播放</string>
     <string name="action_download_play">先下后播</string>
     <string name="action_local_play">本地播放</string>
@@ -29,7 +28,10 @@
     <string name="want_watch">想看</string>
     <string name="about_title">关于 松松看片</string>
     <string name="about_developer">开发者：jyt2018</string>
-    <string name="about_usage">操作说明：\n1. 上下键选片，OK 键播放在线视频\n2. 行内左右移动可选【先下后播】【删除】\n3. 遥控器菜单键 = 刷新片库\n4. 设置：配置 APK 更新地址与片源地址（默认已填好，不限 Gitee）\n5. 搜索：全网找片（开发中）\n6. 片源：公开直链 JSON 清单，按刷新即入库</string>
+    <string name="about_downloaded">已下载：%1$d 部</string>
+    <string name="about_used">占用空间：%1$sG</string>
+    <string name="about_free">剩余空间：%1$sG</string>
+    <string name="about_usage">操作说明：\n遥控器菜单键 = 刷新片库</string>
     <string name="empty_hint">暂无影片。按刷新键从片库地址拉取。</string>
     <string name="confirm_delete">已看过？删除该条目</string>
     <string name="confirm_ok">再按 OK 确认删除 / 返回取消</string>
@@ -47,4 +49,7 @@
     <string name="update_latest">已是最新版本 (%1$s)</string>
     <string name="update_download_fail">下载失败, 请稍后再试</string>
     <string name="back_again">再按一次返回键返回列表</string>
+    <string name="player_play">播放</string>
+    <string name="player_pause">暂停</string>
+    <string name="player_live">直播/时长未知</string>
 </resources>

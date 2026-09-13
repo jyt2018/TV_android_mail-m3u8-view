@@ -128,15 +128,6 @@
             android:textStyle="bold"
             android:gravity="center" />
 
-        <TextView
-            android:layout_width="72dp"
-            android:layout_height="wrap_content"
-            android:text="编号"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:fontFamily="monospace" />
-
         <LinearLayout
             android:id="@+id/llHeaderFields"
             android:layout_width="0dp"

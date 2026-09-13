@@ -4,6 +4,7 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.tv.mailvod.databinding.ItemVideoBinding
+import com.tv.mailvod.download.MovieFiles
 import com.tv.mailvod.store.VideoItem
 
 /**
@@ -30,7 +31,7 @@ class VideoAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
         val b = holder.binding
-        b.tvTitle.text = item.title + if (item.episode > 0) " E${item.episode}" else ""
+        b.tvTitle.text = item.title
         val meta = listOfNotNull(
             item.year?.toString(),
             item.country?.takeIf { it.isNotBlank() },
@@ -40,7 +41,7 @@ class VideoAdapter(
         b.tvMeta.text = meta
         b.tvMeta.visibility = if (meta.isEmpty()) android.view.View.GONE else android.view.View.VISIBLE
         b.tvDownloaded.visibility =
-            if (item.displayId in downloaded) android.view.View.VISIBLE else android.view.View.GONE
+            if (MovieFiles.keyOf(item.title) in downloaded) android.view.View.VISIBLE else android.view.View.GONE
         b.tvTitle.setOnClickListener { onPlay(item) }
         b.btnPlay.setOnClickListener { onPlay(item) }
         b.btnDownload.setOnClickListener { onDownloadPlay(item) }

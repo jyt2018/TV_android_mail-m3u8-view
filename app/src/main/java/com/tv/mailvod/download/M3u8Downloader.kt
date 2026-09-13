@@ -25,7 +25,7 @@ import javax.crypto.spec.SecretKeySpec
  * @param m3u8Url  播放列表 URL
  * @param headers  防盗链 headers (来自片源条目, 可为空 map)
  * @param workDir  临时分片目录 (下载完成后自动清理)
- * @param outFile  最终输出文件 (编号.ts; 扩展名由调用方给定, 实际写出 .ts)
+ * @param outFile  最终输出文件 (片名.ts; 扩展名由调用方给定, 实际写出 .ts)
  * @param listener 进度/结果回调 (全部在工作线程回调, UI 层需自行切主线程)
  */
 class M3u8Downloader(
@@ -54,6 +54,10 @@ class M3u8Downloader(
 
     @Volatile
     private var cancelled = false
+
+    /** 非用户取消的自动中止 (开局连续失败, 判定网络不可达)。 */
+    @Volatile
+    private var aborted = false
 
     private val ua =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -157,17 +161,21 @@ class M3u8Downloader(
 
         val total = finalSegs.size
 
-        // 多线程下载分片
+        // 多线程下载分片。失败也计数并刷新文案 (否则 UI 长时间停在上一阶段);
+        // 开局零成功且连败 16 个 → 判定网络不可达, 自动中止避免无限重试空耗。
+        listener.onProgress(stageText(0, 0, total), 0)
         val ok = AtomicInteger(0)
+        val failed = AtomicInteger(0)
         val pool = Executors.newFixedThreadPool(8)
         val futures = finalSegs.mapIndexed { idx, seg ->
             pool.submit {
                 if (downloadSegment(idx, seg)) {
                     val done = ok.incrementAndGet()
-                    listener.onProgress(
-                        "正在下载分片 $done/$total",
-                        (done * 100L / total).toInt()
-                    )
+                    listener.onProgress(stageText(done, failed.get(), total), (done * 100L / total).toInt())
+                } else {
+                    val f = failed.incrementAndGet()
+                    if (ok.get() == 0 && f >= 16) aborted = true
+                    listener.onProgress(stageText(ok.get(), f, total), ((ok.get() + f) * 100L / total).toInt())
                 }
             }
         }
@@ -175,6 +183,7 @@ class M3u8Downloader(
         futures.forEach { it.get() }
         val success = ok.get()
         if (cancelled) return
+        if (aborted) throw IOException("前 ${failed.get()} 个分片全部下载失败, 已中止 (网络不可达或片源失效)")
         if (success == 0) throw IOException("全部 $total 个分片下载失败")
 
         // 拼接 TS → 直接作为最终产物 (ExoPlayer 原生支持 MPEG-TS, 跳过重封装省几分钟且不会失败)
@@ -210,12 +219,16 @@ class M3u8Downloader(
 
     // ═══════════════════════ 分片下载 ═══════════════════════
 
+    /** 下载阶段文案: 成功/失败都体现, 失败非零时附加失败数。 */
+    private fun stageText(done: Int, failed: Int, total: Int): String =
+        "正在下载分片 $done/$total" + if (failed > 0) " (失败 $failed)" else ""
+
     /** 下载单个分片 (断点续传 + 重试 + AES-128 解密)。 */
     private fun downloadSegment(idx: Int, seg: Segment): Boolean {
         val f = File(workDir, "$idx.ts")
         if (f.exists() && f.length() > 0) return true
-        repeat(5) {
-            if (cancelled) return false
+        repeat(3) {
+            if (cancelled || aborted) return false
             try {
                 var data = httpGet(seg.url)
                 val k = seg.key
@@ -249,10 +262,10 @@ class M3u8Downloader(
     private fun httpGet(urlStr: String): ByteArray {
         val future = httpExec.submit(java.util.concurrent.Callable { httpGetImpl(urlStr) })
         return try {
-            future.get(45, java.util.concurrent.TimeUnit.SECONDS)
+            future.get(30, java.util.concurrent.TimeUnit.SECONDS)
         } catch (e: java.util.concurrent.TimeoutException) {
             future.cancel(true)
-            throw IOException("请求超时(45s): $urlStr")
+            throw IOException("请求超时(30s): $urlStr")
         } catch (e: java.util.concurrent.ExecutionException) {
             throw (e.cause as? Exception) ?: IOException(e.message ?: "download failed")
         }

@@ -78,7 +78,7 @@ class ListActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val list = App.instance.library.load()
             adapter.submit(list)
-            adapter.setDownloaded(MovieFiles.downloadedIds(this@ListActivity))
+            adapter.setDownloaded(MovieFiles.downloadedKeys(this@ListActivity))
             binding.tvEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
             binding.rvList.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE
             updateTitle(list.size)
@@ -163,20 +163,35 @@ class ListActivity : AppCompatActivity() {
             .show()
     }
 
-    /** 关于弹窗(点左上角标题触发): 版本、开发者、检查更新入口。 */
+    /** 关于弹窗(点左上角标题触发): 版本、下载统计(已下载部数/占用/剩余空间)、操作说明。 */
     private fun showAboutDialog() {
         val info = packageManager.getPackageInfo(packageName, 0)
-        val message = getString(R.string.about_developer) +
-            "\n版本: v " + info.versionName + " (" + info.versionCode + ")" +
-            "\n\n" + getString(R.string.about_usage)
-        AlertDialog.Builder(this)
-            .setTitle(R.string.about_title)
-            .setIcon(R.mipmap.ic_launcher)
-            .setMessage(message)
-            .setPositiveButton(android.R.string.ok, null)
-            .setNeutralButton(R.string.update_check) { _, _ -> updater.check(manual = true) }
-            .show()
+        lifecycleScope.launch {
+            val items = App.instance.library.load()
+            val ids = MovieFiles.downloadedKeys(this@ListActivity)
+            val titles = items.filter { MovieFiles.keyOf(it.title) in ids }.map { it.title }.toSortedSet()
+            val dir = MovieFiles.dir(this@ListActivity)
+            val usedBytes = dir.walkBottomUp().filter { it.isFile }.sumOf { it.length() }
+            val freeBytes = dir.freeSpace
+            val message = getString(R.string.about_developer) +
+                "\n版本: v " + info.versionName + " (" + info.versionCode + ")" +
+                "\n" + getString(R.string.about_downloaded, titles.size) +
+                "\n" + getString(R.string.about_used, fmtGb(usedBytes)) +
+                "\n" + getString(R.string.about_free, fmtGb(freeBytes)) +
+                "\n\n" + getString(R.string.about_usage)
+            AlertDialog.Builder(this@ListActivity)
+                .setTitle(R.string.about_title)
+                .setIcon(R.mipmap.ic_launcher)
+                .setMessage(message)
+                .setPositiveButton(android.R.string.ok, null)
+                .setNeutralButton(R.string.update_check) { _, _ -> updater.check(manual = true) }
+                .show()
+        }
     }
+
+    /** 字节转 GB 字符串, 两位小数。 */
+    private fun fmtGb(bytes: Long): String =
+        String.format(java.util.Locale.US, "%.2f", bytes / 1073741824.0)
 
     private fun confirmDelete(item: VideoItem) {
         val dp = resources.displayMetrics.density
@@ -184,8 +199,7 @@ class ListActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding((24 * dp).toInt(), (16 * dp).toInt(), (24 * dp).toInt(), 0)
             addView(TextView(this@ListActivity).apply {
-                text = getString(R.string.confirm_ok) + "\n" + item.title +
-                    if (item.episode > 0) " E${item.episode}" else ""
+                text = getString(R.string.confirm_ok) + "\n" + item.title
             })
             addView(CheckBox(this@ListActivity).apply {
                 text = getString(R.string.dl_del_also)
@@ -199,10 +213,10 @@ class ListActivity : AppCompatActivity() {
             .setPositiveButton(R.string.action_delete) { _, _ ->
                 val alsoFiles = wrap.getChildAt(1) as CheckBox
                 lifecycleScope.launch {
-                    App.instance.library.delete(item.id)
-                    App.instance.progress.remove(ProgressStore.keyOf(item.title, item.episode))
+                    App.instance.library.delete(item.title)
+                    App.instance.progress.remove(ProgressStore.keyOf(item.title))
                     if (alsoFiles.isChecked) {
-                        MovieFiles.deleteLocalFiles(this@ListActivity, item.displayId)
+                        MovieFiles.deleteLocalFiles(this@ListActivity, item.title)
                     }
                     loadList()
                 }
@@ -214,8 +228,7 @@ class ListActivity : AppCompatActivity() {
     private fun startPlayer(item: VideoItem) {
         val intent = Intent(this, PlayerActivity::class.java).apply {
             putExtra(PlayerActivity.EXTRA_URL, item.url)
-            putExtra(PlayerActivity.EXTRA_TITLE,
-                item.title + if (item.episode > 0) " E${item.episode}" else "")
+            putExtra(PlayerActivity.EXTRA_TITLE, item.title)
             val headers = item.headers
             putExtra(PlayerActivity.EXTRA_HEADER_KEYS, headers.keys.toTypedArray())
             putExtra(PlayerActivity.EXTRA_HEADER_VALS, headers.values.toTypedArray())
@@ -223,7 +236,7 @@ class ListActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
-    /** "先下后播": 已下载直接播放, 否则弹进度对话框下载 → 拼接 MP4(编号.ts) → 播放本地文件。 */
+    /** "先下后播": 已下载直接播放, 否则弹进度对话框下载 → 拼接 TS(片名.ts) → 播放本地文件。 */
     private fun downloadThenPlay(item: VideoItem) {
         MovieFiles.localFileFor(this, item)?.let {
             Toast.makeText(this, R.string.dl_exists, Toast.LENGTH_SHORT).show()
@@ -238,7 +251,7 @@ class ListActivity : AppCompatActivity() {
             setPadding((24 * dp).toInt(), (16 * dp).toInt(), (24 * dp).toInt(), 0)
         }
         val tvDetail = TextView(this).apply {
-            text = item.title + if (item.episode > 0) " E${item.episode}" else ""
+            text = item.title
         }
         val tvStatus = TextView(this).apply {
             text = getString(R.string.dl_stage_parse)
@@ -261,8 +274,8 @@ class ListActivity : AppCompatActivity() {
         downloader = M3u8Downloader(
             m3u8Url = item.url,
             headers = item.headers,
-            workDir = File(dir, "${item.displayId}_tmp"),
-            outFile = File(dir, "${item.displayId}.ts"),
+            workDir = MovieFiles.tmpDir(this, item),
+            outFile = MovieFiles.outFile(this, item),
             listener = object : M3u8Downloader.Listener {
                 override fun onProgress(stage: String, percent: Int, indeterminate: Boolean) =
                     runOnUiThread {
@@ -273,7 +286,7 @@ class ListActivity : AppCompatActivity() {
 
                 override fun onDone(file: File) = runOnUiThread {
                     dlg.dismiss()
-                    adapter.setDownloaded(MovieFiles.downloadedIds(this@ListActivity))
+                    adapter.setDownloaded(MovieFiles.downloadedKeys(this@ListActivity))
                     playLocal(file, item)
                 }
 
@@ -292,8 +305,7 @@ class ListActivity : AppCompatActivity() {
         val intent = Intent(this, PlayerActivity::class.java).apply {
             putExtra(PlayerActivity.EXTRA_URL, file.absolutePath)
             putExtra(PlayerActivity.EXTRA_FALLBACK_URL, item.url)
-            putExtra(PlayerActivity.EXTRA_TITLE,
-                item.title + if (item.episode > 0) " E${item.episode}" else "")
+            putExtra(PlayerActivity.EXTRA_TITLE, item.title)
             putExtra(PlayerActivity.EXTRA_HEADER_KEYS, item.headers.keys.toTypedArray())
             putExtra(PlayerActivity.EXTRA_HEADER_VALS, item.headers.values.toTypedArray())
         }

@@ -16,7 +16,7 @@ data class Config(
     @SerialName("update_url")
     val updateUrl: String = "https://gitee.com/unixsam/mailvod-release/raw/master/version.json",
     @SerialName("list_columns")
-    val listColumns: List<String> = listOf("title", "episode", "year", "director"),
+    val listColumns: List<String> = listOf("title", "country", "type", "year", "director"),
     val player: Player = Player()
 ) {
     @Serializable
@@ -25,6 +25,8 @@ data class Config(
         val autoNext: Boolean = false
     )
 
+    /** 旧配置可能残留 episode 列, 统一过滤; 全空时回退默认。 */
     val listColumnsNormalized: List<String>
-        get() = listColumns.ifEmpty { listOf("title", "episode", "year", "director") }
+        get() = listColumns.filter { it != "episode" }
+            .ifEmpty { listOf("title", "country", "type", "year", "director") }
 }

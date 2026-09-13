@@ -10,14 +10,16 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.tv.mailvod.R
 import com.tv.mailvod.config.Config
+import com.tv.mailvod.download.MovieFiles
 import com.tv.mailvod.databinding.ItemVideoBinding
 import com.tv.mailvod.store.VideoItem
 import kotlin.math.roundToInt
 
 /**
- * 列表适配器: 每行 = 箭头固定列 | 已下载✔固定列 | 编号固定列 | 字段列(固定宽度+weight混合) | 在线播放 | 先下后播/本地播放 | 删除。
- * 选中行 = btnPlay/btnDownloadPlay/btnDelete 任一 focused (rowRoot 不可聚焦)
- *         → rowRoot.isSelected=true(黄框保留) + 箭头显示 ">"
+ * 列表适配器: 每行 = 已下载✔固定列 | 字段列(片名weight=1+固定宽度字段) | 在线播放 | 先下后播/本地播放 | 删除。
+ * 选中行 = rowRoot 或行内任一按钮 focused (rowRoot 可聚焦)
+ *         → rowRoot.isSelected=true(黄框保留)
+ * 行根获得焦点时定向默认按钮: 已下载行 → 本地播放, 未下载行 → 在线播放 (focusPreferred)。
  * 通过 setHighlight(pos) 统一清除所有行高亮后再设置目标行,避免两行同时亮。
  *
  * 列宽策略(与表头完全一致 → 天然对齐):
@@ -40,10 +42,10 @@ class VideoAdapter(
         notifyDataSetChanged()
     }
 
-    /** 更新已下载集合 (displayId), 行内 ✔ 与 "本地播放" 按钮文字随之刷新。 */
-    fun setDownloaded(ids: Set<String>) {
+    /** 更新已下载集合 (MovieFiles.keyOf(片名)), 行内 ✔ 与 "本地播放" 按钮文字随之刷新。 */
+    fun setDownloaded(keys: Set<String>) {
         downloaded.clear()
-        downloaded.addAll(ids)
+        downloaded.addAll(keys)
         notifyDataSetChanged()
     }
 
@@ -57,6 +59,15 @@ class VideoAdapter(
             val target = pos == position
             vh.binding.rowRoot.isSelected = target
         }
+    }
+
+    /** 行获得焦点时的默认按钮: 已下载 → 本地播放, 否则 → 在线播放。post 延后一拍避免与焦点分发竞态。 */
+    fun focusPreferred(rv: RecyclerView, position: Int) {
+        val vh = rv.findViewHolderForAdapterPosition(position) as? VH ?: return
+        if (position < 0 || position >= items.size) return
+        val target = if (MovieFiles.keyOf(items[position].title) in downloaded)
+            vh.binding.btnDownloadPlay else vh.binding.btnPlay
+        rv.post { target.requestFocus() }
     }
 
     inner class VH(val binding: ItemVideoBinding) : RecyclerView.ViewHolder(binding.root) {
@@ -75,16 +86,19 @@ class VideoAdapter(
             }
 
             // 方向键: btnPlay ↔ btnDownloadPlay ↔ btnDelete
-            // (rowRoot 不可聚焦, 焦点进入行时默认落在 btnPlay "直接播放" 上)
+            // (rowRoot 可聚焦: 上下键在行间移动, 左右键行内走按钮 / 退到行根后进上下行)
             binding.btnPlay.nextFocusRightId = R.id.btnDownloadPlay
             binding.btnDownloadPlay.nextFocusRightId = R.id.btnDelete
             binding.btnDownloadPlay.nextFocusLeftId = R.id.btnPlay
             binding.btnDelete.nextFocusLeftId = R.id.btnDownloadPlay
 
-            // 任何一个按钮获得焦点时,统一刷新所有行高亮
+            // 任何一个按钮或行根获得焦点时,统一刷新所有行高亮
             val focusTarget = { pos: Int ->
                 val rv = binding.rowRoot.parent as? RecyclerView
                 if (rv != null) setHighlight(rv, pos)
+            }
+            binding.rowRoot.onFocusChangeListener = View.OnFocusChangeListener { _, has ->
+                if (has) focusTarget(bindingAdapterPosition)
             }
             binding.btnPlay.onFocusChangeListener = View.OnFocusChangeListener { _, has ->
                 if (has) focusTarget(bindingAdapterPosition)
@@ -121,9 +135,8 @@ class VideoAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
-        val isDownloaded = item.displayId in downloaded
+        val isDownloaded = MovieFiles.keyOf(item.title) in downloaded
         holder.binding.tvDownloaded.text = if (isDownloaded) "✔" else ""
-        holder.binding.tvNum.text = item.displayId
         holder.binding.btnDownloadPlay.text = holder.binding.root.context.getString(
             if (isDownloaded) R.string.action_local_play else R.string.action_download_play
         )
@@ -155,7 +168,6 @@ class VideoAdapter(
                 "year"    -> LinearLayout.LayoutParams(dp(50), LinearLayout.LayoutParams.WRAP_CONTENT)
                 "director"-> LinearLayout.LayoutParams(dp(160), LinearLayout.LayoutParams.WRAP_CONTENT)
                 "actors"  -> LinearLayout.LayoutParams(dp(160), LinearLayout.LayoutParams.WRAP_CONTENT)
-                "episode" -> LinearLayout.LayoutParams(dp(40), LinearLayout.LayoutParams.WRAP_CONTENT)
                 else      -> LinearLayout.LayoutParams(dp(56), LinearLayout.LayoutParams.WRAP_CONTENT)
             }
         }
