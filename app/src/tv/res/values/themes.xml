@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.MailM3U8" parent="Theme.Leanback">
+    <style name="Theme.EasyVod" parent="Theme.Leanback">
         <item name="android:windowBackground">@color/bg</item>
         <item name="android:colorBackground">@color/bg</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:buttonStyle">@style/NeuBtn</item>
         <!-- 弹窗按钮(AlertDialog 确定/取消/删除等)统一为片库行内按钮同款风格。
              关键: AlertDialog 按钮样式读取的是 alertDialogTheme 而非主主题的 buttonBarButtonStyle,
              必须显式覆盖 alertDialogTheme, 否则框架默认 dialog 主题回退成无边框文本按钮 (v0.8.5 修复)。 -->
@@ -12,14 +13,19 @@
         <item name="android:alertDialogTheme">@style/AlertDlg</item>
     </style>
 
-    <style name="Theme.MailM3U8.Fullscreen" parent="Theme.MailM3U8">
+    <!-- 全局按钮文字色: 聚焦/按压=强调色(凹陷态上的可读强调), 默认=正文色; 背景由布局/选择器显式指定 -->
+    <style name="NeuBtn" parent="@android:style/Widget.DeviceDefault.Button">
+        <item name="android:textColor">@color/btn_text</item>
+    </style>
+
+    <style name="Theme.EasyVod.Fullscreen" parent="Theme.EasyVod">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowContentOverlay">@null</item>
     </style>
 
-    <!-- 弹窗专用主题: 继承框架 Dialog.Alert, 仅替换按钮样式 (主主题的 buttonBarButtonStyle 对弹窗无效) -->
-    <style name="AlertDlg" parent="@android:style/Theme.DeviceDefault.Dialog.Alert">
+    <!-- 弹窗专用主题: 继承框架 Light Dialog.Alert(浅色弹窗, 配合深灰正文), 仅替换按钮样式 (主主题的 buttonBarButtonStyle 对弹窗无效) -->
+    <style name="AlertDlg" parent="@android:style/Theme.DeviceDefault.Light.Dialog.Alert">
         <item name="android:buttonBarButtonStyle">@style/DlgBtn</item>
     </style>
 

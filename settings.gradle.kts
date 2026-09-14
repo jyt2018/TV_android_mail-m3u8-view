@@ -19,5 +19,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "MailM3U8TV"
+rootProject.name = "easyVodTV"
 include(":app")

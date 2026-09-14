@@ -118,7 +118,6 @@ class ListActivity : ComponentActivity() {
 
         binding.btnRefresh.setOnClickListener { startActivity(Intent(this, RefreshActivity::class.java)) }
         binding.btnSettings.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
-        binding.btnSearch.setOnClickListener { startActivity(Intent(this, SearchActivity::class.java)) }
         binding.ivIcon.setOnClickListener { startActivity(Intent(this, AboutActivity::class.java)) }
 
         // 启动后自动刷新一次 (仅 onCreate, 从播放页返回的 onResume 不重复拉取)

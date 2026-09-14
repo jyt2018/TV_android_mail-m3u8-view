@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 按钮默认态: 新拟态凸起(右下暗影 + 左上高光 + 与背景同色的表面) -->
+<!-- 手机影片卡片: 新拟态凸起圆角面板 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:left="2dp"
-        android:top="2dp">
+        android:left="2.5dp"
+        android:top="2.5dp">
         <shape android:shape="rectangle">
             <solid android:color="@color/neu_dark" />
-            <corners android:radius="8dp" />
+            <corners android:radius="14dp" />
         </shape>
     </item>
     <item
-        android:right="2dp"
-        android:bottom="2dp">
+        android:right="2.5dp"
+        android:bottom="2.5dp">
         <shape android:shape="rectangle">
             <solid android:color="@color/neu_light" />
-            <corners android:radius="8dp" />
+            <corners android:radius="14dp" />
         </shape>
     </item>
     <item
@@ -23,8 +23,8 @@
         android:top="1dp"
         android:bottom="1dp">
         <shape android:shape="rectangle">
-            <solid android:color="@color/btn_normal_bg" />
-            <corners android:radius="8dp" />
+            <solid android:color="@color/bg_row" />
+            <corners android:radius="13dp" />
         </shape>
     </item>
 </layer-list>

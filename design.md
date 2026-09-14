@@ -1,4 +1,4 @@
-# MailM3U8 设计文档
+# easyVod 设计文档
 
 > TV 端「Gitee 片源清单 → 合并到本地 JSON → 列表选择 → 播放 m3u8」+ 手机版（phone flavor）
 > 状态：已实现（Gitee 收片、双端自动更新已上线）
@@ -106,7 +106,6 @@
 | **片库页** | `ListActivity` / activity_list | 主页影片列表, 打开 app 即此页 |
 | **播放页** | `PlayerActivity` / activity_player | 在线 HLS 或本地 ts 播放 |
 | **刷新页** | `RefreshActivity` / activity_refresh | 说明文字 + 遥控器示意图(TV) + 刷新按钮(默认焦点) + log 文本框; 左上角 ← 返回 |
-| **搜索页** | `SearchActivity` / activity_search | 界面壳: 左上角 ← 返回按钮(遥控器返回键等效) + 搜索框 + 搜索按钮 + 结果列表 |
 | **设置页** | `SettingsActivity` / activity_settings | 双输入框: APK 更新地址 + 片源地址, 保存后写入 config.json |
 | **关于页** | `AboutActivity` / activity_about | 版本 / 开发者 / 已下载统计 / 操作说明 / 检查更新按钮(默认焦点) |
 | **下载弹窗** | 片库页内 `AlertDialog` / dialog_download | 先下后播的进度弹窗 (解析→检测广告→下载分片 x/y→拼接 TS) |
@@ -116,7 +115,7 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ [头像] 松松看片 (共3) v x.y.z                            [刷新] [设置] [搜索]   │
+│ [头像] 松松看片 (共3) v x.y.z                                [刷新] [设置]   │
 ├────────┬───────────────────────────────────┬──────────┬──────────┬──────────┤
 │ 已下载 │ 片名            国家  类型 年份 导演 │ 在线播放 │ 先下后播 │   删除   │ ← 表头
 ├────────┼───────────────────────────────────┼──────────┼──────────┼──────────┤
@@ -126,40 +125,19 @@
   ↑64dp   ↑片名自适应(weight=1) + 120 + 70 + 50 + 160  ↑84dp     ↑84dp    ↑56dp
 ```
 
-- **标题行**：左起为头像图标 + 标题 + 小字版本号 + 弹性空白 + 刷新/设置/搜索三按钮
-  - **头像图标** `ivIcon`（48dp）：`drawable/ic_head.png`（透明背景）。可聚焦，聚焦时黄框（`bg_icon_focus`：2dp #FFD700 12dp 圆角描边）；OK 点击进**关于页**（版本 / 开发者 / 已下载部数 / 占用空间 / 剩余空间 / 操作说明 / 检查更新按钮）
+- **标题行**：左起为头像图标 + 标题 + 小字版本号 + 弹性空白 + 刷新/设置两按钮
+  - **头像图标** `ivIcon`（48dp）：`drawable/ic_head.png`（透明背景）。可聚焦，聚焦时强调色圆角描边（`bg_icon_focus`：2dp）；OK 点击进**关于页**（版本 / 开发者 / 已下载部数 / 占用空间 / 剩余空间 / 操作说明 / 检查更新按钮）
   - **版本号**：紧跟标题后小字体（14sp 灰），格式 `v x.y.z`（v 后带空格），动态读 PackageInfo
-  - **三按钮等宽**：刷新 / 设置 / 搜索，统一 84dp 宽、文字居中、间距 12dp
+  - **两按钮等宽**：刷新 / 设置，统一 84dp 宽、文字居中、间距 12dp
   - **刷新**：进入刷新页（页内按钮触发拉取；片库页遥控器菜单键仍可直接刷新）
   - **设置**：进入设置页，双输入框预填 APK 更新地址与片源地址，保存后 `ConfigLoader.save()` 写 `files/config.json`
-  - **搜索**：进入搜索页（界面壳）
 - **已下载列**：该条目存在本地 `片名.ts` 时显示 ✔；已下载行的"先下后播"按钮文字变为 **"本地播放"**。
 - 表头不可聚焦，纯装饰。**表头与表体列宽共用同一个 `VideoAdapter.buildColumnLayoutParams()` 函数**，天然对齐。
-- 选中行有**橙色外框 + 深灰背景**（`rowRoot.isSelected=true` 触发 `bg_row_selector` 里的 `state_selected`）。
-- **rvList 右缘垂直滚动条**：`scrollbars=vertical` + 自定义 `scrollbar_thumb`（6dp 半透明白圆角细条），滚动时显示、停止 1.5s 后淡出（框架默认 thumb 在深色界面几乎不可见）。
-- **行根 rowRoot 可聚焦**：上下键落在行根 → 定向默认按钮（见 5.3）；行根/按钮任一聚焦黄框都会亮。
+- 选中行有**强调色描边 + 略深表面**（`rowRoot.isSelected=true` 触发 `bg_row_selector` 里的 `state_selected`）。
+- **rvList 右缘垂直滚动条**：`scrollbars=vertical` + 自定义 `scrollbar_thumb`（6dp 半透明深灰圆角细条），滚动时显示、停止 1.5s 后淡出。
+- **行根 rowRoot 可聚焦**：上下键落在行根 → 定向默认按钮（见 5.3）；行根/按钮任一聚焦强调色环都会亮。
 
-### 5.1.1 搜索页（界面壳，逻辑未实现）
-
-```
-┌────────────────────────────────────────────┐
-│ [← 返回]                                    │ ← 左上角, 遥控器返回键等效
-│                                             │
-│ [输入片名关键词____________________] [搜索]  │ ← 搜索行
-├────────────────────────────────────┬────────┤
-│ 流浪地球3                           │ [想看] │ ← item_search 行
-│ 2027 / 科幻 / 中国                  │        │
-├────────────────────────────────────┼────────┤
-│ ...                                │ [想看] │
-└────────────────────────────────────┴────────┘
-```
-
-- 返回按钮 `btnBack` → finish；系统返回键同样生效
-- `etKeyword` 搜索框 + `btnSearch` 搜索按钮（点击暂提示"搜索功能开发中"）
-- `rvResults` 结果列表 + `tvEmpty` 空态提示；行布局 `item_search`：标题(粗体, weight=1) + 摘要 + 行尾 **想看** 按钮(84dp)
-- 搜索数据源与"想看"行为待后续实现
-
-### 5.1.2 刷新页
+### 5.1.1 刷新页
 
 ```
 ┌────────────────────────────────────────────┐
@@ -170,7 +148,7 @@
 │              │ ▲  │                        │
 │            ┌─┴────┴─┐                      │
 │            │◀ OK  ▶ │  ← 遥控器示意图      │
-│            └─┬────┬─┘    (菜单键黄框高亮)  │
+│            └─┬────┬─┘  (菜单键强调色描边)  │
 │              │ ▼  │                       │
 │              └────┘                       │
 │            ┌──────────┐                    │
@@ -187,18 +165,18 @@
 ```
 
 - 返回按钮 `btnBack` → finish；系统返回键同样生效
-- **遥控器示意图**（仅 TV 版）：`bg_remote_body` 机身 + `bg_remote_key` 方向键(▲▼◀▶) + `bg_remote_ok` OK 键 + `bg_remote_menu` 菜单键（黄框高亮，突出"菜单键 = 刷新"入口）；手机版无示意图，说明文字为触屏措辞（"点击【刷新】按钮从片源地址拉取片库"）
+- **遥控器示意图**（仅 TV 版）：`bg_remote_body` 机身 + `bg_remote_key` 方向键(▲▼◀▶) + `bg_remote_ok` OK 键 + `bg_remote_menu` 菜单键（强调色描边高亮，突出"菜单键 = 刷新"入口）；手机版无示意图，说明文字为触屏措辞（"点击【刷新】按钮从片源地址拉取片库"）
 - **刷新按钮默认焦点**：遥控器进页即可 OK 触发；刷新过程逐行写入 log 文本框（连接片源地址… / 清单共 N 条 / 其中新增 N 条 / 刷新完毕，失败显示原因），期间按钮禁用防连按
 - 本页遥控器菜单键（`KEYCODE_MENU`）同样直接触发刷新（与片库页一致）
 - 返回片库页后其 `onResume` 自动重载列表
 
-### 5.1.3 设置页
+### 5.1.2 设置页
 
 - 双输入框：**APK 更新地址** + **片源地址**（默认值预填），手机版输入框沿用四周描边框背景 `bg_edit_box`
 - 保存按钮默认焦点；非空校验（任一为空 Toast 提示）→ `ConfigLoader.save()` 写 `files/config.json` → Toast"设置已保存"并关闭页面
 - 左上角返回按钮；返回片库页后配置改动即时生效（`onResume` 重载）
 
-### 5.1.4 关于页
+### 5.1.3 关于页
 
 - 内容：版本信息（开发者 / `v x.y.z (code)`）+ 下载统计（已下载 N 部 / 占用空间 / 剩余空间，目录遍历异步计算）+ 操作说明
 - **检查更新**按钮默认焦点，走共用 `AppUpdater` 手动检查
@@ -225,7 +203,7 @@
 | **上/下** | 行间移动（代码强制路由）：`ListActivity.dispatchKeyEvent` 拦截 → `moveRowFocus(±1)` 滚动到目标行并把焦点交给该行**默认按钮**：**已下载行 → 本地播放，未下载行 → 在线播放**；首行再向上/焦点不在列表内时不拦截走默认焦点 |
 | **右** | 行根 → 默认按钮 → 删除键；删除键再右 → 下一行（RecyclerView 默认） |
 | **左** | 行内：删除键 → 先下后播 → 在线播放；再左 → 退回行根（不重定向），再按左 → 上一行 |
-| **OK** | 焦点在在线播放键 → 播放页(HLS); 先下后播/本地播放 → 下载弹窗或本地播放; 删除键 → 删除确认弹窗; 刷新/设置/搜索键 → 对应页面; 头像 → 关于页 |
+| **OK** | 焦点在在线播放键 → 播放页(HLS); 先下后播/本地播放 → 下载弹窗或本地播放; 删除键 → 删除确认弹窗; 刷新/设置键 → 对应页面; 头像 → 关于页 |
 | **菜单键** | 片库页与刷新页全局监听 `KeyEvent.KEYCODE_MENU`（=82），直接触发刷新（进刷新页看 log 或原地静默刷新） |
 | **返回** | 播放页 2 秒内连按两次返回片库页（第一次弹 Toast「再按一次返回键返回列表」，进度照常落盘；手机版无此拦截） |
 
@@ -236,20 +214,26 @@
 **行根定向默认按钮**：焦点进入行根时若来源不是本行按钮（`oldFocus.parent !== rowRoot`），经 `VideoAdapter.focusPreferred(rv, pos)` 把焦点交给已下载行的 btnDownloadPlay（"本地播放"）或未下载行的 btnPlay（"在线播放"）；来源是本行按钮（左右键退出按钮区）则留在行根不重定向，避免焦点死循环。
 
 **选中态管理**：
-- **行内/行根获得焦点**：`VideoAdapter.setHighlight(rv, pos)` 给该行 `isSelected=true`（黄框+背景），清其他行
+- **行内/行根获得焦点**：`VideoAdapter.setHighlight(rv, pos)` 给该行 `isSelected=true`（强调色描边+背景），清其他行
 - **跳出 RecyclerView**（按 ↑ 到刷新按钮）：ListActivity 的 `OnGlobalFocusChangeListener` 检测 `newFocus` 不在 rvList 内 → `setHighlight(rv, -1)` 清所有行
 
 **弹窗按钮统一**：TV 主题提供 `AlertDlg` 主题——剩余 AlertDialog（下载进度、删除确认、更新确认）的按钮（确定/取消/删除）统一为 `DlgBtn` 样式（见 5.4）。
 
-### 5.4 按钮样式
+### 5.4 按钮样式与视觉风格
 
-**弹窗按钮**（仅剩下载弹窗与删除确认弹窗用 AlertDialog）：AlertDialog 按钮样式必须经 **`alertDialogTheme`** 生效（主主题 `buttonBarButtonStyle` 对弹窗无效）——`AlertDlg` 主题（父 `Theme.DeviceDefault.Dialog.Alert`）内设 `buttonBarButtonStyle=@style/DlgBtn`。`DlgBtn` 默认态 `bg_dlg_btn`（深色填充 + 1dp 白色细描边，明确呈按钮而非文本），聚焦/按压态 `btn_focused`（蓝底）。
+**整体风格：浅色经典新拟态（Neumorphism）**。基底 `#E0E5EC`（灰白），元素与背景**同色同质**，立体感全部来自模拟"左上光源"的双向柔和阴影：右下暗影 `neu_dark #AEB8C6` + 左上高光 `neu_light #FFFFFF`（layer-list 偏移叠加实现）。三种状态语言：
+
+- **凸起**（默认）：暗影层偏移(+2dp,+2dp) + 高光层偏移(-2dp,-2dp) + 同色表面（`btn_normal` / `bg_row_normal` / `bg_card` / `bg_remote_body`）
+- **凹陷**（按压/输入/log）：基底略深 `neu_inset #D7DDE5` + 内圈暗环（`btn_pressed` / `bg_edit_box` / `bg_log`）
+- **聚焦**（TV 遥控器）：凹陷基底 + **强调色内环 `accent #E8590C`**（`btn_focused`）+ 按钮文字变强调色（`res/color/btn_text` 状态选择器，主题 `buttonStyle=NeuBtn` 统一挂接）——低对比风格下保证沙发距离焦点可辨
+
+正文 `text_primary #3A4553` / 次要 `text_secondary #8794A6`；选中行表面略深 + 2dp 强调色描边（`bg_row_focused`）。弹窗也切浅色（TV `AlertDlg` 父级 `Theme.DeviceDefault.Light.Dialog.Alert`；phone `Theme.AppCompat.Light.Dialog.Alert`），弹窗按钮（`DlgBtn`）与行内按钮同款凸起/凹陷。
 
 四个行内按钮（在线播放/先下后播/本地播放/删除）统一：`bg_btn_selector` 背景，`minWidth=0dp minHeight=0dp`（Android Button 默认有 ~48dp minWidth，必须显式设 0 才能缩小），`padding 10dp / 4dp`（横向/纵向），`textSize=14sp`。宽度固定：在线播放/先下后播(本地播放) 84dp（4 字文案），删除 56dp；刷新按钮 `wrap_content`。
 
-标题栏三按钮：刷新 / 设置 / 搜索统一 **84dp 等宽 + gravity 居中**，间距 12dp，同样是 `bg_btn_selector` + `minWidth/minHeight=0dp`。头像图标聚焦态用独立的 `bg_icon_focus`（透明底 + 2dp 黄描边），与按钮的蓝色填充背景区分。
+标题栏两按钮：刷新 / 设置统一 **84dp 等宽 + gravity 居中**，间距 12dp，同样是 `bg_btn_selector`。头像图标聚焦态用独立的 `bg_icon_focus`（透明底 + 2dp 强调色描边）。
 
-**刷新/设置/搜索/关于四页按钮**：与片库页同一套 `bg_btn_selector` 背景 + `minWidth/minHeight=0dp`（返回 / 刷新 / 保存 / 检查更新等），整应用按钮风格统一；页面默认焦点分别落刷新 / 保存 / 检查更新按钮（搜索页无默认焦点）。
+**刷新/设置/关于三页按钮**：与片库页同一套 `bg_btn_selector` 背景 + `minWidth/minHeight=0dp`（返回 / 刷新 / 保存 / 检查更新等），整应用按钮风格统一；页面默认焦点分别落刷新 / 保存 / 检查更新按钮。
 
 ### 5.5 先下后播 / 本地播放
 
@@ -317,7 +301,7 @@
 | 手机首装拉取 0 条（邮件收片时代，日志 `SKIP: prefix not match`） | SetupActivity 建的配置落盘了过时默认值主题前缀，过滤不到 `m3u8_view` 主题邮件 | 默认值改回正确前缀；已装设备就地修 config.json；应用内帮助文案同步修正 |
 | 按钮 padding 改了尺寸没变化 | Android Button 类有默认 `minWidth=48dp minHeight=48dp`，padding 再小也被撑住 | 显式设 `android:minWidth="0dp" android:minHeight="0dp"` |
 | 表头表体列错位 | 表头和表体各自定义列宽，互不相同；表头末尾没给按钮留占位 | 列宽统一到 `VideoAdapter.buildColumnLayoutParams()`；表头末尾加等宽占位 View，精确匹配表体按钮宽度 |
-| 焦点跳到外部时旧行黄框不消失 | `setHighlight` 只在 RecyclerView 子 View 焦点变化时触发，焦点跳到刷新按钮时没人清 | ListActivity 挂 `addOnGlobalFocusChangeListener`，检测焦点不在 rvList 内时调 `setHighlight(rv, -1)` |
+| 焦点跳到外部时旧行选中框不消失 | `setHighlight` 只在 RecyclerView 子 View 焦点变化时触发，焦点跳到刷新按钮时没人清 | ListActivity 挂 `addOnGlobalFocusChangeListener`，检测焦点不在 rvList 内时调 `setHighlight(rv, -1)` |
 | 本地视频提示"续播"却从 0 开始 | ExoPlayer `setMediaItem/setMediaSource` 默认 resetPosition，先 seekTo 再设媒体源会丢起始位置 | 顺序改为：设媒体源 → seekTo(断点) → prepare() |
 | 快进后播放页控制条常驻不消失 | 快进后缓冲期 `isPlaying=false`，按它判断是否排隐藏定时器，此时不排 → 常驻 | 隐藏判据改用 `playWhenReady`（缓冲期仍为 true，仅用户暂停才 false） |
 | 弹窗按钮"看起来像文本" | 只设了主主题 `buttonBarButtonStyle`，但 AlertDialog 实际读取 `alertDialogTheme`，框架默认 dialog 主题将其覆盖为无边框文本样式 | 新增 `AlertDlg` 主题（父 `Theme.DeviceDefault.Dialog.Alert`）显式覆盖，默认态换深色填充+细描边背景 |
@@ -349,14 +333,14 @@ app/src/
 │   └── AndroidManifest.xml            权限 + 公共 application + FileProvider
 ├── tv/                            TV 版专属
 │   ├── java/com/tv/mailvod/ui/        ListActivity(遥控器) / VideoAdapter(焦点) /
-│   │                                  PlayerActivity(按键壳) / SearchActivity /
+│   │                                  PlayerActivity(按键壳) /
 │   │                                  RefreshActivity / SettingsActivity / AboutActivity
 │   ├── res/                           TV 布局/焦点 drawable/Theme.Leanback 主题/ic_head/ic_banner
 │   │                                  + 刷新页遥控器示意图(bg_remote_*)/log 框(bg_log)
 │   └── AndroidManifest.xml            leanback + banner + LEANBACK_LAUNCHER + REQUEST_INSTALL_PACKAGES
 └── phone/                         手机版专属
     ├── java/com/tv/mailvod/ui/        ListActivity(触屏) / VideoAdapter / PlayerActivity(触控条壳)
-    │                                  + RefreshActivity / SettingsActivity / AboutActivity / SearchActivity
+    │                                  + RefreshActivity / SettingsActivity / AboutActivity
     ├── res/                           触屏布局 + Theme.AppCompat 主题 + 措辞覆盖 strings
     └── AndroidManifest.xml            仅 LAUNCHER, 触屏, 无 leanback
 ```
@@ -381,28 +365,26 @@ minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug �
 | 重装 App 后刷新 | 从片源地址全量重建 library.json |
 | 已下载条目 | 已下载列显示 ✔，"先下后播"按钮文字变为"本地播放" |
 | 上下键在列表内选行 | 焦点落目标行默认按钮：已下载行 → 本地播放，未下载行 → 在线播放 |
-| 选中行显示橙色外框 + 深灰背景 | OK |
-| 按钮聚焦时行黄框保留 | OK（isSelected=true 不随 focus 丢失） |
-| 焦点从第一行按 ↑ 跳到刷新按钮，旧行黄框消失 | OK（全局焦点监听 setHighlight(rv, -1)） |
+| 选中行显示强调色描边 + 略深表面 | OK |
+| 按钮聚焦时行选中态保留 | OK（isSelected=true 不随 focus 丢失） |
+| 焦点从第一行按 ↑ 跳到刷新按钮，旧行选中态消失 | OK（全局焦点监听 setHighlight(rv, -1)） |
 | 遥控器在某行按右 → 焦点移到播放键；再右 → 删除键；左 → 回行 | OK（方向键强制路由） |
 | 删除后再更新清单 | 该片按新片重新入库 |
 | 按遥控器「菜单」键（片库页/刷新页） | 直接触发刷新 |
 | 刷新页：进入默认焦点在刷新按钮，OK 后 log 逐行显示连接/条数/新增/完毕，左上角返回回片库页 | OK |
 | 表头表体列对齐 | OK（共用 buildColumnLayoutParams + 按钮占位） |
 | 按钮尺寸缩小 | OK（minWidth=0dp + padding 10/4） |
-| 标题行显示 [头像] 松松看片 (共x) v x.y.z + 刷新/设置/搜索 三等宽按钮 | OK |
-| 头像透明背景 PNG；遥控器焦点移上出现黄框 | OK（bg_icon_focus 2dp 黄描边） |
+| 标题行显示 [头像] 松松看片 (共x) v x.y.z + 刷新/设置 两等宽按钮 | OK |
+| 头像透明背景 PNG；遥控器焦点移上出现强调色描边框 | OK（bg_icon_focus 2dp 描边） |
 | OK 点头像 → 关于页（版本/开发者/已下载统计/操作说明/检查更新，默认焦点在检查更新） | OK |
 | 快进后播放页控制条 5 秒内自动隐藏 | OK（playWhenReady 判据） |
 | 控制条显示时页眉左上角出现「片名 (年份/国家)」小字 | OK |
 | 设置 → 设置页预填 APK 更新地址与片源地址（默认内置，均可在设置页修改），保存后 config.json 更新 | OK（ConfigLoader.save） |
-| 搜索 → 进入搜索页；返回按钮 / 遥控器返回键回片库页 | OK（搜索逻辑未实现，点搜索提示开发中） |
 
 ---
 
 ## 10. 后续可做
 
-- [ ] 自定义按钮聚焦 selector（按钮选中时也有橙色边框，目前是蓝色背景）
 - [ ] 空列表时给 btnRefresh 加下一行焦点，让遥控器首次按 OK 就能刷新
 - [ ] 开机自启 + 首次启动自动刷新
 - [ ] headers 白名单（仅允许 UA/Referer/Origin/Cookie）
@@ -433,14 +415,13 @@ minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug �
 | 包名 | com.tv.mailvod | com.mailvod.phone（可共存/并行调试） |
 | 版本 | 独立演进（build.gradle.kts productFlavors 内定义） | 独立演进 |
 | 入口 | LEANBACK_LAUNCHER + LAUNCHER | 仅 LAUNCHER |
-| 主题 | Theme.Leanback 系 | Theme.AppCompat.NoActionBar 系（同深色配色） |
+| 主题 | Theme.Leanback 系 | Theme.AppCompat.NoActionBar 系（同浅色新拟态配色） |
 | 播放交互 | 遥控器 OK=播放/暂停直接切换(不弹控制条, dispatchKeyEvent 拦截), 左右 ±10s, 返回=二次确认退出 | ExoPlayer 默认触控条, 默认横屏(sensorLandscape), 返回直接退出 |
 | 列表交互 | D-pad 焦点高亮 + 表头表格 | 卡片行(片名大字 20sp 粗体 / 元信息 / 已下载标签) + 按钮行(在线播放/先下后播/删除, 最后一行右对齐) |
-| 刷新页 | 遥控器示意图(菜单键黄框高亮) + 刷新按钮(默认焦点) + log 框 | 无示意图, 说明文字为触屏措辞, 其余同构 |
+| 刷新页 | 遥控器示意图(菜单键强调色描边高亮) + 刷新按钮(默认焦点) + log 框 | 无示意图, 说明文字为触屏措辞, 其余同构 |
 | 关于页 | 点头像图标进入 | 点左上角标题「松松看片」进入(版本/开发者/已下载统计/操作说明/检查更新) |
 | 设置页 | 双输入框(activity_settings 布局: APK更新+片源地址) | 同构, 输入框四周描边框状背景 bg_edit_box |
 | 自动更新 | 有(REQUEST_INSTALL_PACKAGES) | 有(同权限) |
-| 搜索页 | 界面壳已实现 | 界面壳已实现 |
 
 ### 11.2 共用抽取（避免两份拷贝）
 

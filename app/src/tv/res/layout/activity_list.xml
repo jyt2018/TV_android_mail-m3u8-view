@@ -5,7 +5,7 @@
     android:orientation="vertical"
     android:background="@color/bg">
 
-    <!-- 标题行: 左标题 + 标题后小字版本号 + 中弹性 + 右刷新/设置/搜索按钮 -->
+    <!-- 标题行: 左标题 + 标题后小字版本号 + 中弹性 + 右刷新/设置按钮 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -80,22 +80,6 @@
             android:paddingTop="4dp"
             android:paddingBottom="4dp"
             android:text="@string/action_settings" />
-
-        <Button
-            android:id="@+id/btnSearch"
-            android:layout_width="84dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:background="@drawable/bg_btn_selector"
-            android:gravity="center"
-            android:textSize="14sp"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp"
-            android:text="@string/action_search" />
     </LinearLayout>
 
     <!-- 表头行: 结构与 item_video.xml 完全一致 (不含按钮,用等宽占位) -->

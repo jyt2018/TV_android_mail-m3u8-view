@@ -61,7 +61,6 @@ class ListActivity : AppCompatActivity() {
 
         binding.btnRefresh.setOnClickListener { startActivity(Intent(this, RefreshActivity::class.java)) }
         binding.btnSettings.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
-        binding.btnSearch.setOnClickListener { startActivity(Intent(this, SearchActivity::class.java)) }
 
         // 启动自动刷新一次 (零配置可用, 片库地址有内置默认值)
         doRefresh()
