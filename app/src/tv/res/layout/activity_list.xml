@@ -50,14 +50,6 @@
             android:layout_height="1dp"
             android:layout_weight="1" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="按遥控器【菜单】按钮刷新"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp"
-            android:layout_marginEnd="8dp" />
-
         <Button
             android:id="@+id/btnRefresh"
             android:layout_width="84dp"
@@ -161,7 +153,10 @@
         android:layout_weight="1"
         android:clipToPadding="false"
         android:paddingBottom="8dp"
-        android:scrollbars="vertical" />
+        android:scrollbars="vertical"
+        android:scrollbarThumbVertical="@drawable/scrollbar_thumb"
+        android:scrollbarSize="6dp"
+        android:scrollbarDefaultDelayBeforeFade="1500" />
 
     <TextView
         android:id="@+id/tvEmpty"

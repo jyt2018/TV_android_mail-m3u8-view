@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TV 关于页: 返回栏 + 图标/标题 + 版本信息 + 下载统计 + 操作说明 + 检查更新按钮(默认焦点) -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <!-- 顶栏: 左上角返回按钮 (= 遥控器返回键) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp">
+
+        <Button
+            android:id="@+id/btnBack"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:background="@drawable/bg_btn_selector"
+            android:textSize="14sp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text="@string/action_back" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="@string/about_title"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <!-- 与返回按钮配重的占位, 让标题严格居中 -->
+        <View
+            android:layout_width="60dp"
+            android:layout_height="1dp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingTop="8dp">
+
+        <ImageView
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:contentDescription="@string/app_name"
+            android:src="@drawable/ic_head" />
+
+        <TextView
+            android:id="@+id/tvVersionInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/tvStats"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center"
+            android:text="@string/about_usage"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btnCheck"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:background="@drawable/bg_btn_selector"
+            android:textSize="14sp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:text="@string/update_check" />
+    </LinearLayout>
+</LinearLayout>

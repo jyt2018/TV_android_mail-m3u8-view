@@ -116,10 +116,10 @@ class ListActivity : ComponentActivity() {
             }
         }
 
-        binding.btnRefresh.setOnClickListener { doRefresh() }
-        binding.btnSettings.setOnClickListener { showSettingsDialog() }
+        binding.btnRefresh.setOnClickListener { startActivity(Intent(this, RefreshActivity::class.java)) }
+        binding.btnSettings.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
         binding.btnSearch.setOnClickListener { startActivity(Intent(this, SearchActivity::class.java)) }
-        binding.ivIcon.setOnClickListener { showAboutDialog() }
+        binding.ivIcon.setOnClickListener { startActivity(Intent(this, AboutActivity::class.java)) }
 
         // 启动后自动刷新一次 (仅 onCreate, 从播放页返回的 onResume 不重复拉取)
         doRefresh()
@@ -197,7 +197,7 @@ class ListActivity : ComponentActivity() {
         binding.tvTitle.text = if (count > 0) "$base (共$count)" else base
     }
 
-    /** 拉取 Gitee 片库并合并到 library.json。 */
+    /** 拉取 Gitee 片库并合并到 library.json。遥控器菜单键快捷刷新; "刷新"按钮进刷新页(带 log)。 */
     private fun doRefresh() {
         Toast.makeText(this, R.string.fetching, Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
@@ -217,61 +217,6 @@ class ListActivity : ComponentActivity() {
                     Toast.LENGTH_LONG).show()
             }
         }
-    }
-
-    /** 关于弹窗: 版本、下载统计(已下载部数/占用/剩余空间)、操作说明。 */
-    private fun showAboutDialog() {
-        val info = packageManager.getPackageInfo(packageName, 0)
-        lifecycleScope.launch {
-            val items = App.instance.library.load()
-            val ids = MovieFiles.downloadedKeys(this@ListActivity)
-            val titles = items.filter { MovieFiles.keyOf(it.title) in ids }.map { it.title }.toSortedSet()
-            val dir = MovieFiles.dir(this@ListActivity)
-            val usedBytes = dir.walkBottomUp().filter { it.isFile }.sumOf { it.length() }
-            val freeBytes = dir.freeSpace
-            val message = getString(R.string.about_developer) +
-                "\n版本: v " + info.versionName + " (" + info.versionCode + ")" +
-                "\n" + getString(R.string.about_downloaded, titles.size) +
-                "\n" + getString(R.string.about_used, fmtGb(usedBytes)) +
-                "\n" + getString(R.string.about_free, fmtGb(freeBytes)) +
-                "\n\n" + getString(R.string.about_usage)
-            AlertDialog.Builder(this@ListActivity)
-                .setTitle(R.string.about_title)
-                .setIcon(R.drawable.ic_head)
-                .setMessage(message)
-                .setPositiveButton(android.R.string.ok, null)
-                .setNeutralButton(R.string.update_check) { _, _ -> updater.check(manual = true) }
-                .show()
-        }
-    }
-
-    /** 字节转 GB 字符串, 两位小数。 */
-    private fun fmtGb(bytes: Long): String =
-        String.format(java.util.Locale.US, "%.2f", bytes / 1073741824.0)
-
-    /** 设置弹窗: 输入 APK 更新地址与片源地址(默认值内置), 确定后写入 config.json。 */
-    private fun showSettingsDialog() {
-        val cfg = App.instance.configLoader.config
-        val view = layoutInflater.inflate(R.layout.dialog_settings, null)
-        val etUpdateUrl = view.findViewById<android.widget.EditText>(R.id.etUpdateUrl)
-        val etUrl = view.findViewById<android.widget.EditText>(R.id.etUrl)
-        etUpdateUrl.setText(cfg.updateUrl)
-        etUrl.setText(cfg.libraryUrl)
-        AlertDialog.Builder(this)
-            .setTitle(R.string.settings_title)
-            .setView(view)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                val updateUrl = etUpdateUrl.text.toString().trim()
-                val libUrl = etUrl.text.toString().trim()
-                if (updateUrl.isEmpty() || libUrl.isEmpty()) {
-                    Toast.makeText(this, R.string.settings_url_missing, Toast.LENGTH_LONG).show()
-                    return@setPositiveButton
-                }
-                App.instance.configLoader.save(cfg.copy(updateUrl = updateUrl, libraryUrl = libUrl))
-                Toast.makeText(this, R.string.settings_saved, Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
     }
 
     private fun confirmDelete(item: VideoItem) {
@@ -304,8 +249,12 @@ class ListActivity : ComponentActivity() {
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
-        // 遥控器场景: 默认焦点落在"删除"按钮上, 避免焦点停在正文/取消键
-        dlg.getButton(AlertDialog.BUTTON_POSITIVE).requestFocus()
+        // 遥控器场景: 默认焦点落在"删除"按钮上。
+        // 时机必须在 onShow 回调(按钮已 attach, requestFocus 才生效); show() 返回后立即请求无效,
+        // 焦点无处落 → 方向键无法移动 → 表现为"按钮无法获得焦点" (0.8.8 修复)。
+        dlg.setOnShowListener {
+            dlg.getButton(AlertDialog.BUTTON_POSITIVE).requestFocus()
+        }
     }
 
     /** 删除条目对应的本地文件 (片名.ts/mp4 + 临时分片目录)。共用 MovieFiles。 */

@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TV 刷新页: 返回栏 + 说明 + 遥控器示意图(菜单键高亮) + 刷新按钮(默认焦点) + log 文本框 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <!-- 顶栏: 左上角返回按钮 (= 遥控器返回键) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp">
+
+        <Button
+            android:id="@+id/btnBack"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:background="@drawable/bg_btn_selector"
+            android:textSize="14sp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text="@string/action_back" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="@string/refresh_title"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <!-- 与返回按钮配重的占位, 让标题严格居中 -->
+        <View
+            android:layout_width="60dp"
+            android:layout_height="1dp" />
+    </LinearLayout>
+
+    <!-- 说明文字 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:text="@string/refresh_hint"
+        android:textColor="@color/text_secondary"
+        android:textSize="15sp" />
+
+    <!-- 遥控器示意图: 方向键 + OK + 菜单键(黄框高亮) -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="14dp"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:background="@drawable/bg_remote_body"
+        android:paddingTop="16dp"
+        android:paddingBottom="16dp">
+
+        <TextView
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:background="@drawable/bg_remote_key"
+            android:gravity="center"
+            android:text="@string/remote_up"
+            android:textColor="#CCFFFFFF"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:background="@drawable/bg_remote_key"
+                android:gravity="center"
+                android:text="@string/remote_left"
+                android:textColor="#CCFFFFFF"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_remote_ok"
+                android:gravity="center"
+                android:text="@string/remote_ok"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:background="@drawable/bg_remote_key"
+                android:gravity="center"
+                android:text="@string/remote_right"
+                android:textColor="#CCFFFFFF"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_remote_key"
+            android:gravity="center"
+            android:text="@string/remote_down"
+            android:textColor="#CCFFFFFF"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="84dp"
+            android:layout_height="34dp"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_remote_menu"
+            android:gravity="center"
+            android:text="@string/remote_menu"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- 刷新按钮(默认焦点) -->
+    <Button
+        android:id="@+id/btnRefresh"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="16dp"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:background="@drawable/bg_btn_selector"
+        android:textSize="14sp"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:text="@string/action_refresh" />
+
+    <!-- log 文本框: 多行, 刷新过程逐行显示 -->
+    <TextView
+        android:id="@+id/tvLog"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_log"
+        android:focusable="false"
+        android:gravity="top"
+        android:padding="12dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp"
+        android:typeface="monospace" />
+</LinearLayout>

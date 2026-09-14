@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.CheckBox
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -45,7 +44,7 @@ class ListActivity : AppCompatActivity() {
         binding = ActivityListBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.tvTitle.text = getString(R.string.app_name)
-        binding.tvTitle.setOnClickListener { showAboutDialog() }
+        binding.tvTitle.setOnClickListener { startActivity(Intent(this, AboutActivity::class.java)) }
         val ver = runCatching {
             packageManager.getPackageInfo(packageName, 0).versionName
         }.getOrDefault("?")
@@ -60,8 +59,9 @@ class ListActivity : AppCompatActivity() {
         binding.rvList.adapter = adapter
         binding.rvList.itemAnimator?.changeDuration = 0
 
-        binding.btnRefresh.setOnClickListener { doRefresh() }
-        binding.btnSettings.setOnClickListener { showSettingsDialog() }
+        binding.btnRefresh.setOnClickListener { startActivity(Intent(this, RefreshActivity::class.java)) }
+        binding.btnSettings.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
+        binding.btnSearch.setOnClickListener { startActivity(Intent(this, SearchActivity::class.java)) }
 
         // 启动自动刷新一次 (零配置可用, 片库地址有内置默认值)
         doRefresh()
@@ -90,7 +90,7 @@ class ListActivity : AppCompatActivity() {
         binding.tvTitle.text = if (count > 0) "$base (共$count)" else base
     }
 
-    /** 拉取 Gitee 片库并合并到 library.json。 */
+    /** 拉取 Gitee 片库并合并到 library.json。启动时自动执行; "刷新"按钮进刷新页(带 log)。 */
     private fun doRefresh() {
         Toast.makeText(this, R.string.fetching, Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
@@ -110,88 +110,6 @@ class ListActivity : AppCompatActivity() {
             }
         }
     }
-
-    /** 设置对话框: 输入 APK 更新地址与片源地址(内置默认值), 保存后刷新片库。 */
-    private fun showSettingsDialog() {
-        val cfg = App.instance.configLoader.config
-        val dp = resources.displayMetrics.density
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding((24 * dp).toInt(), (16 * dp).toInt(), (24 * dp).toInt(), 0)
-        }
-        fun label(text: String) = TextView(this@ListActivity).apply {
-            this.text = text
-            setTextColor(getColor(R.color.text_secondary))
-            textSize = 13f
-        }
-        // 框状输入框(四周描边, 替代系统下划线); 换背景后系统内边距失效, 需手动补
-        fun urlBox(preset: String) = EditText(this).apply {
-            hint = "https://gitee.com/..."
-            // 多行(带 MULTI_LINE 标志才有自动换行): 长地址完整显示, 不再单行横向滚动
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
-                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-            setLines(3)
-            gravity = android.view.Gravity.TOP or android.view.Gravity.START
-            setText(preset)
-            background = androidx.core.content.ContextCompat.getDrawable(
-                this@ListActivity, R.drawable.bg_edit_box)
-            setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (10 * dp).toInt())
-        }
-        val etUpdateUrl = urlBox(cfg.updateUrl)
-        val etUrl = urlBox(cfg.libraryUrl)
-        layout.addView(label(getString(R.string.settings_update_hint)))
-        layout.addView(etUpdateUrl)
-        layout.addView(label(getString(R.string.settings_url_hint)))
-        layout.addView(etUrl)
-
-        AlertDialog.Builder(this)
-            .setTitle(R.string.settings_title)
-            .setView(layout)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                val updateUrl = etUpdateUrl.text.toString().trim()
-                val libUrl = etUrl.text.toString().trim()
-                if (updateUrl.isEmpty() || libUrl.isEmpty()) {
-                    Toast.makeText(this, R.string.settings_url_missing, Toast.LENGTH_LONG).show()
-                    return@setPositiveButton
-                }
-                App.instance.configLoader.save(cfg.copy(updateUrl = updateUrl, libraryUrl = libUrl))
-                Toast.makeText(this, R.string.settings_saved, Toast.LENGTH_SHORT).show()
-                doRefresh()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    /** 关于弹窗(点左上角标题触发): 版本、下载统计(已下载部数/占用/剩余空间)、操作说明。 */
-    private fun showAboutDialog() {
-        val info = packageManager.getPackageInfo(packageName, 0)
-        lifecycleScope.launch {
-            val items = App.instance.library.load()
-            val ids = MovieFiles.downloadedKeys(this@ListActivity)
-            val titles = items.filter { MovieFiles.keyOf(it.title) in ids }.map { it.title }.toSortedSet()
-            val dir = MovieFiles.dir(this@ListActivity)
-            val usedBytes = dir.walkBottomUp().filter { it.isFile }.sumOf { it.length() }
-            val freeBytes = dir.freeSpace
-            val message = getString(R.string.about_developer) +
-                "\n版本: v " + info.versionName + " (" + info.versionCode + ")" +
-                "\n" + getString(R.string.about_downloaded, titles.size) +
-                "\n" + getString(R.string.about_used, fmtGb(usedBytes)) +
-                "\n" + getString(R.string.about_free, fmtGb(freeBytes)) +
-                "\n\n" + getString(R.string.about_usage)
-            AlertDialog.Builder(this@ListActivity)
-                .setTitle(R.string.about_title)
-                .setIcon(R.mipmap.ic_launcher)
-                .setMessage(message)
-                .setPositiveButton(android.R.string.ok, null)
-                .setNeutralButton(R.string.update_check) { _, _ -> updater.check(manual = true) }
-                .show()
-        }
-    }
-
-    /** 字节转 GB 字符串, 两位小数。 */
-    private fun fmtGb(bytes: Long): String =
-        String.format(java.util.Locale.US, "%.2f", bytes / 1073741824.0)
 
     private fun confirmDelete(item: VideoItem) {
         val dp = resources.displayMetrics.density

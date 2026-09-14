@@ -27,6 +27,21 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".ui.RefreshActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
+            android:name=".ui.AboutActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".ui.PlayerActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
