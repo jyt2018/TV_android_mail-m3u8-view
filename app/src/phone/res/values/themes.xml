@@ -2,39 +2,13 @@
 <!-- 手机版主题: AppCompat 系(TV 版用 Theme.Leanback 系, 见 src/tv/res/values/themes.xml) -->
 <resources>
 
-    <style name="Theme.EasyVod" parent="Theme.AppCompat.NoActionBar">
+    <style name="Theme.MailM3U8" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowBackground">@color/bg</item>
         <item name="android:colorBackground">@color/bg</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
-        <item name="buttonStyle">@style/NeuBtn</item>
-        <item name="alertDialogTheme">@style/AlertDlg</item>
-        <item name="android:alertDialogTheme">@style/AlertDlg</item>
     </style>
 
-    <!-- 全局按钮: 新拟态凸起背景(按压=凹陷), 文字色状态选择器; 布局未显式设 background 时生效 -->
-    <style name="NeuBtn" parent="Widget.AppCompat.Button">
-        <item name="android:background">@drawable/bg_btn_selector</item>
-        <item name="android:textColor">@color/btn_text</item>
-    </style>
-
-    <!-- 弹窗专用主题: AppCompat Light Dialog.Alert(浅色弹窗, 配合深灰正文), 按钮换新拟态凸起 -->
-    <style name="AlertDlg" parent="Theme.AppCompat.Light.Dialog.Alert">
-        <item name="buttonBarButtonStyle">@style/DlgBtn</item>
-    </style>
-
-    <style name="DlgBtn" parent="Widget.AppCompat.Button.ButtonBar.AlertDialog">
-        <item name="android:background">@drawable/bg_btn_selector</item>
-        <item name="android:textColor">@color/btn_text</item>
-        <item name="android:textSize">14sp</item>
-        <item name="android:minWidth">0dp</item>
-        <item name="android:minHeight">0dp</item>
-        <item name="android:paddingLeft">20dp</item>
-        <item name="android:paddingRight">20dp</item>
-        <item name="android:paddingTop">8dp</item>
-        <item name="android:paddingBottom">8dp</item>
-    </style>
-
-    <style name="Theme.EasyVod.Fullscreen" parent="Theme.EasyVod">
+    <style name="Theme.MailM3U8.Fullscreen" parent="Theme.MailM3U8">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowContentOverlay">@null</item>

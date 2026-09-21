@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 遥控器示意图 OK 确认键: 略深圆形(按键群中的视觉中心) -->
+<!-- 遥控器示意图 OK 确认键: 蓝色圆形 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
-    <solid android:color="#FFC9D2DD" />
-    <stroke
-        android:width="1dp"
-        android:color="#FFF6F9FD" />
+    <solid android:color="#FF1976D2" />
 </shape>

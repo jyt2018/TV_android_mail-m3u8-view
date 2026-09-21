@@ -12,7 +12,7 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.EasyVod"
+        android:theme="@style/Theme.MailM3U8"
         android:usesCleartextTraffic="true">
 
         <provider

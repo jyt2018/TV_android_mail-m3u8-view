@@ -46,6 +46,8 @@ class RefreshActivity : AppCompatActivity() {
                 val items = sync.fetch(cfg.libraryUrl)
                 log(getString(R.string.refresh_log_total, items.size))
                 val added = App.instance.library.merge(items)
+                // 刷新成功: 片库页 onResume 时列表滚动到顶部
+                ListActivity.pendingScrollTop = true
                 log(getString(R.string.refresh_log_added, added))
                 log(getString(R.string.refresh_log_done))
             }.onFailure { e ->

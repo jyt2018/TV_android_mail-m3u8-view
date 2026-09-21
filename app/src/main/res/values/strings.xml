@@ -57,6 +57,7 @@
     <string name="update_check_fail">检查失败, 请确认网络</string>
     <string name="update_latest">已是最新版本 (%1$s)</string>
     <string name="update_download_fail">下载失败, 请稍后再试</string>
+    <string name="update_downloading">更新包正在下载, 请稍候…</string>
     <string name="back_again">再按一次返回键返回列表</string>
     <string name="player_play">播放</string>
     <string name="player_pause">暂停</string>

@@ -40,6 +40,6 @@
             android:name=".ui.PlayerActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
-            android:theme="@style/Theme.EasyVod.Fullscreen" />
+            android:theme="@style/Theme.MailM3U8.Fullscreen" />
     </application>
 </manifest>

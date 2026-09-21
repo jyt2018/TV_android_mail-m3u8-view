@@ -1,23 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 按钮聚焦/按压态: 新拟态凹陷(基底略深) + 强调色内环, 遥控器焦点清晰可辨 -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
-        <shape android:shape="rectangle">
-            <solid android:color="@color/btn_focused_bg" />
-            <corners android:radius="8dp" />
-        </shape>
-    </item>
-    <item
-        android:bottom="1dp"
-        android:left="1dp"
-        android:right="1dp"
-        android:top="1dp">
-        <shape android:shape="rectangle">
-            <stroke
-                android:width="2dp"
-                android:color="@color/accent" />
-            <corners android:radius="7dp" />
-            <solid android:color="#00000000" />
-        </shape>
-    </item>
-</layer-list>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/btn_focused_bg" />
+    <corners android:radius="4dp" />
+</shape>

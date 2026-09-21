@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -37,10 +38,17 @@ import java.io.File
  */
 class ListActivity : ComponentActivity() {
 
+    companion object {
+        /** 刷新页刷新成功后置位; 片库页 onResume 消费: 列表滚动到顶部。 */
+        var pendingScrollTop = false
+    }
+
     private lateinit var binding: ActivityListBinding
     private lateinit var adapter: VideoAdapter
     private val sync = LibrarySync()
     private var downloader: M3u8Downloader? = null
+    // 播放页返回时定位到的行位置(刚才播放的片), onResume 消费后复位 -1
+    private var lastPlayedPos = -1
     private val updater = com.tv.mailvod.net.AppUpdater(this, com.tv.mailvod.net.UpdateChecker.CHANNEL_TV)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -128,7 +136,13 @@ class ListActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        loadList()
+        // 刷新页刷新成功后置位 pendingScrollTop, 返回片库页时列表滚到顶部(消费后复位)
+        val top = pendingScrollTop
+        pendingScrollTop = false
+        // 播放页返回时焦点定位到刚才播放的行(消费后复位); 删除行回填走 confirmDelete 的 loadList(pos)
+        val played = lastPlayedPos
+        lastPlayedPos = -1
+        loadList(focusPos = played, scrollTop = top)
         // 自动检查更新(TV 上按返回退出进程常驻, onCreate 不再重跑 → 挪到 onResume + 30 分钟节流)
         if (updater.shouldAutoCheck()) updater.check(manual = false)
     }
@@ -180,7 +194,7 @@ class ListActivity : ComponentActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
-    private fun loadList() {
+    private fun loadList(focusPos: Int = -1, scrollTop: Boolean = false) {
         lifecycleScope.launch {
             val list = App.instance.library.load()
             adapter.submit(list)
@@ -188,6 +202,18 @@ class ListActivity : ComponentActivity() {
             binding.tvEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
             binding.rvList.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE
             updateTitle(list.size)
+            // 焦点回填: focusPos >= 0 表示刚删除了一行, 该位置由下一行顶上, 焦点留在原地;
+            // 删光后列表为空, 焦点给刷新按钮, 遥控器不落空。
+            if (list.isEmpty()) {
+                binding.btnRefresh.requestFocus()
+            } else if (focusPos >= 0) {
+                val target = focusPos.coerceAtMost(list.size - 1)
+                binding.rvList.scrollToPosition(target)
+                binding.rvList.post { adapter.focusPreferred(binding.rvList, target) }
+            } else if (scrollTop) {
+                // 刷新后新片置顶, 列表滚回顶部
+                binding.rvList.scrollToPosition(0)
+            }
         }
     }
 
@@ -209,7 +235,7 @@ class ListActivity : ComponentActivity() {
             result.onSuccess { added ->
                 Toast.makeText(this@ListActivity,
                     getString(R.string.fetch_done, added), Toast.LENGTH_SHORT).show()
-                loadList()
+                loadList(scrollTop = true)
             }.onFailure { e ->
                 Toast.makeText(this@ListActivity,
                     getString(R.string.fetch_fail, e.message ?: e.javaClass.simpleName),
@@ -226,33 +252,50 @@ class ListActivity : ComponentActivity() {
             addView(TextView(this@ListActivity).apply {
                 text = getString(R.string.confirm_ok) + "\n\n" + item.title
             })
-            addView(CheckBox(this@ListActivity).apply {
-                text = getString(R.string.dl_del_also)
-                isChecked = true
-                setPadding(0, (12 * dp).toInt(), 0, 0)
-            })
         }
+        // 复选框与文本拆成两个控件水平排列(方框垂直居中于文本行): CheckBox 自带文本时
+        // 方框由框架拉伸定位, TV 深色主题下与文本错位
+        val chk = CheckBox(this).apply { isChecked = true }
+        wrap.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            addView(chk)
+            addView(TextView(this@ListActivity).apply {
+                text = getString(R.string.dl_del_also)
+                setPadding((8 * dp).toInt(), 0, 0, 0)
+            })
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = (12 * dp).toInt() })
         val dlg = AlertDialog.Builder(this)
             .setTitle(R.string.confirm_delete)
             .setView(wrap)
             .setPositiveButton(R.string.action_delete) { _, _ ->
-                val alsoFiles = wrap.getChildAt(1) as CheckBox
+                // 删除前记录行位置: 重载后焦点回填到原位置(下一行顶上), 见 loadList(focusPos)
+                val pos = adapter.positionOf(item)
                 lifecycleScope.launch {
                     App.instance.library.delete(item.title)
                     App.instance.progress.remove(ProgressStore.keyOf(item.title))
-                    if (alsoFiles.isChecked) {
+                    if (chk.isChecked) {
                         MovieFiles.deleteLocalFiles(this@ListActivity, item.title)
                     }
-                    loadList()
+                    loadList(pos)
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
-        // 遥控器场景: 默认焦点落在"删除"按钮上。
-        // 时机必须在 onShow 回调(按钮已 attach, requestFocus 才生效); show() 返回后立即请求无效,
-        // 焦点无处落 → 方向键无法移动 → 表现为"按钮无法获得焦点" (0.8.8 修复)。
+        // 遥控器: 默认焦点落"删除"按钮。
+        // 时机必须在 onShow 回调(按钮已 attach, requestFocus 才生效); show() 返回后立即请求无效 (0.8.8)。
+        // 另: 弹窗内含可聚焦控件(复选框)时, 窗口获得焦点瞬间框架会把初始焦点塞给第一个可聚焦
+        // view(复选框), 该时机晚于 onShow — 仅在 onShow 里 requestFocus 会被覆盖回复选框,
+        // 必须 post 到消息队列之后执行才能稳赢。
         dlg.setOnShowListener {
-            dlg.getButton(AlertDialog.BUTTON_POSITIVE).requestFocus()
+            // 删除/取消按钮之间加间距(系统默认几乎贴在一起)
+            val cancel = dlg.getButton(AlertDialog.BUTTON_NEGATIVE)
+            (cancel.layoutParams as ViewGroup.MarginLayoutParams).marginEnd = (16 * dp).toInt()
+            cancel.requestLayout()
+            val del = dlg.getButton(AlertDialog.BUTTON_POSITIVE)
+            del.post { del.requestFocus() }
         }
     }
 
@@ -268,6 +311,7 @@ class ListActivity : ComponentActivity() {
     }
 
     private fun startPlayer(item: VideoItem) {
+        lastPlayedPos = adapter.positionOf(item)   // 返回片库页时定位到本行
         val intent = Intent(this, PlayerActivity::class.java).apply {
             putExtra(PlayerActivity.EXTRA_URL, item.url)
             putExtra(PlayerActivity.EXTRA_TITLE, item.title)
@@ -344,6 +388,7 @@ class ListActivity : ComponentActivity() {
 
     /** 播放已下载的本地文件 (ts), 失败自动切在线。 */
     private fun playLocal(file: File, item: VideoItem) {
+        lastPlayedPos = adapter.positionOf(item)   // 返回片库页时定位到本行
         val intent = Intent(this, PlayerActivity::class.java).apply {
             putExtra(PlayerActivity.EXTRA_URL, file.absolutePath)
             putExtra(PlayerActivity.EXTRA_FALLBACK_URL, item.url)

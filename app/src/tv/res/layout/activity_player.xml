@@ -45,18 +45,18 @@
         android:padding="12dp"
         android:visibility="gone">
 
-        <Button
+        <!-- 播放/暂停按钮: 矩形按钮规格(bg_btn_selector 描边) + 白色图标(ic_play/ic_pause, 代码切换),
+             与进度条等高对齐, PNG 资源老安卓可渲染 -->
+        <ImageView
             android:id="@+id/btn_toggle"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
-            android:paddingLeft="16dp"
-            android:paddingRight="16dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
-            android:textSize="14sp"
-            android:textColor="@android:color/white"
+            android:layout_height="36dp"
+            android:background="@drawable/bg_btn_selector"
+            android:paddingLeft="14dp"
+            android:paddingRight="14dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:contentDescription="@string/player_play"
             android:focusable="false" />
 
         <SeekBar

@@ -31,6 +31,11 @@ import java.io.File
  */
 class ListActivity : AppCompatActivity() {
 
+    companion object {
+        /** 刷新页刷新成功后置位; 片库页 onResume 消费: 列表滚动到顶部。 */
+        var pendingScrollTop = false
+    }
+
     private lateinit var binding: ActivityListBinding
     private lateinit var adapter: VideoAdapter
     private val sync = LibrarySync()
@@ -44,7 +49,8 @@ class ListActivity : AppCompatActivity() {
         binding = ActivityListBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.tvTitle.text = getString(R.string.app_name)
-        binding.tvTitle.setOnClickListener { startActivity(Intent(this, AboutActivity::class.java)) }
+        // 头像图标进关于页 (与 TV 版一致); ic_head 已移到 main 共用
+        binding.ivIcon.setOnClickListener { startActivity(Intent(this, AboutActivity::class.java)) }
         val ver = runCatching {
             packageManager.getPackageInfo(packageName, 0).versionName
         }.getOrDefault("?")
@@ -68,12 +74,15 @@ class ListActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        loadList()
+        // 刷新页刷新成功后置位 pendingScrollTop, 返回片库页时列表滚到顶部(消费后复位)
+        val top = pendingScrollTop
+        pendingScrollTop = false
+        loadList(scrollTop = top)
         // Gitee 自动更新(与 TV 共用 AppUpdater, 30 分钟节流)
         if (updater.shouldAutoCheck()) updater.check(manual = false)
     }
 
-    private fun loadList() {
+    private fun loadList(scrollTop: Boolean = false) {
         lifecycleScope.launch {
             val list = App.instance.library.load()
             adapter.submit(list)
@@ -81,6 +90,8 @@ class ListActivity : AppCompatActivity() {
             binding.tvEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
             binding.rvList.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE
             updateTitle(list.size)
+            // 刷新后新片置顶, 列表滚回顶部
+            if (scrollTop) binding.rvList.scrollToPosition(0)
         }
     }
 
@@ -101,7 +112,7 @@ class ListActivity : AppCompatActivity() {
             result.onSuccess { added ->
                 Toast.makeText(this@ListActivity,
                     getString(R.string.fetch_done, added), Toast.LENGTH_SHORT).show()
-                loadList()
+                loadList(scrollTop = true)
             }.onFailure { e ->
                 Toast.makeText(this@ListActivity,
                     getString(R.string.fetch_fail, e.message ?: e.javaClass.simpleName),

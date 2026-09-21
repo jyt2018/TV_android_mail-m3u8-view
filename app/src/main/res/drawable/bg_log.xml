@@ -1,23 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 刷新页 log 文本框背景: 新拟态凹陷面板(基底略深于背景 + 内圈暗环) -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
-        <shape android:shape="rectangle">
-            <solid android:color="@color/neu_inset" />
-            <corners android:radius="10dp" />
-        </shape>
-    </item>
-    <item
-        android:bottom="1dp"
-        android:left="1dp"
-        android:right="1dp"
-        android:top="1dp">
-        <shape android:shape="rectangle">
-            <stroke
-                android:width="1.5dp"
-                android:color="@color/neu_dark" />
-            <corners android:radius="9dp" />
-            <solid android:color="#00000000" />
-        </shape>
-    </item>
-</layer-list>
+<!-- 刷新页 log 文本框背景: 深色圆角 + 细描边, 与输入框风格一致 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FF1A1F26" />
+    <corners android:radius="6dp" />
+    <stroke
+        android:width="1dp"
+        android:color="#FF56606C" />
+</shape>

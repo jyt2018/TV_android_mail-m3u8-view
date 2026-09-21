@@ -1,18 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 浅色新拟态(Neumorphism): 元素与背景同色, 立体感来自左上光源的双向柔和阴影 -->
-    <color name="bg">#FFE0E5EC</color>
-    <color name="bg_row">#FFE0E5EC</color>
-    <color name="bg_header">#FFD3DAE3</color>
-    <color name="bg_row_focused">#FFD9DFE8</color>
-    <color name="text_primary">#FF3A4553</color>
-    <color name="text_secondary">#FF8794A6</color>
-    <color name="accent">#FFE8590C</color>
-    <color name="danger">#FFD64545</color>
-    <color name="focus_border">#FFE8590C</color>
-    <color name="btn_normal_bg">#FFE0E5EC</color>
-    <color name="btn_focused_bg">#FFD7DDE5</color>
-    <color name="neu_dark">#FFAEB8C6</color>
-    <color name="neu_light">#FFFFFFFF</color>
-    <color name="neu_inset">#FFD7DDE5</color>
+    <color name="bg">#FF101418</color>
+    <color name="bg_row">#FF1A1F26</color>
+    <color name="bg_header">#FF202730</color>
+    <color name="bg_row_focused">#FF2A3340</color>
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#FFB0B6BE</color>
+    <color name="accent">#FFFFB300</color>
+    <color name="danger">#FFEF5350</color>
+    <color name="focus_border">#FFFFB300</color>
+    <color name="btn_focused_bg">#FF1E88E5</color>
+    <color name="btn_normal_bg">#FF3C4043</color>
 </resources>

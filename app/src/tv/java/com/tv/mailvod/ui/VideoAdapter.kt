@@ -49,6 +49,9 @@ class VideoAdapter(
         notifyDataSetChanged()
     }
 
+    /** 查条目当前行位置(按 title 唯一键), 找不到返回 -1。删除行后焦点回填用。 */
+    fun positionOf(item: VideoItem): Int = items.indexOfFirst { it.title == item.title }
+
     /** 清除所有行高亮,只给 position 设置 (或 position=-1 全部清除)。 */
     fun setHighlight(rv: RecyclerView, position: Int) {
         for (i in 0 until rv.childCount) {
