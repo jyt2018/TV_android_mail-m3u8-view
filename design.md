@@ -127,7 +127,7 @@
 ```
 
 - **标题行**：左起为头像图标 + 标题 + 小字版本号 + 弹性空白 + 刷新/设置两按钮
-  - **头像图标** `ivIcon`（48dp）：`drawable/ic_head.png`（透明背景, 双端共用）。可聚焦，聚焦时黄框（`bg_icon_focus`：2dp #FFD700 12dp 圆角描边）；OK 点击进**关于页**（版本 / 开发者 / 已下载部数 / 占用空间 / 剩余空间 / 操作说明 / 检查更新按钮）
+  - **头像图标** `ivIcon`（48dp）：`drawable/ic_head.png`（方形整图, 双端共用, 源图 songsong.png 缩放）。可聚焦，聚焦时黄框（`bg_icon_focus`：2dp #FFD700 12dp 圆角描边）；OK 点击进**关于页**（版本 / 开发者 / 已下载部数 / 占用空间 / 剩余空间 / 操作说明 / 检查更新按钮）
   - **版本号**：紧跟标题后小字体（14sp 灰），格式 `v x.y.z`（v 后带空格），动态读 PackageInfo
   - **两按钮等宽**：刷新 / 设置，统一 84dp 宽、文字居中、间距 12dp
   - **刷新**：进入刷新页（页内按钮触发拉取；片库页遥控器菜单键仍可直接刷新）
@@ -333,7 +333,7 @@ app/src/
 │   ├── java/com/tv/mailvod/ui/        ListActivity(遥控器) / VideoAdapter(焦点) /
 │   │                                  PlayerActivity(按键壳) / RefreshActivity /
 │   │                                  SettingsActivity / AboutActivity
-│   ├── res/                           TV 布局/焦点 drawable/Theme.Leanback 主题/ic_banner
+│   ├── res/                           TV 布局/焦点 drawable/Theme.MailM3U8 主题
 │   │                                  + 刷新页遥控器示意图(bg_remote_*)/log 框(bg_log)
 │   └── AndroidManifest.xml            leanback + banner + LEANBACK_LAUNCHER + REQUEST_INSTALL_PACKAGES
 └── phone/                         手机版专属
@@ -378,7 +378,7 @@ minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug �
 | 表头表体列对齐 | OK（共用 buildColumnLayoutParams + 按钮占位） |
 | 按钮尺寸缩小 | OK（minWidth=0dp + padding 10/4） |
 | 标题行显示 [头像] 松松看片 (共x) v x.y.z + 刷新/设置 两等宽按钮 | OK |
-| 头像透明背景 PNG；遥控器焦点移上出现黄框 | OK（bg_icon_focus 2dp 黄描边） |
+| 头像方形 PNG（源图 songsong.png 整图缩放，main 4 密度共用）；遥控器焦点移上出现黄框 | OK（bg_icon_focus 2dp 黄描边） |
 | OK 点头像 → 关于页（版本/开发者/已下载统计/操作说明/检查更新，默认焦点在检查更新） | OK |
 | 快进后播放页控制条 5 秒内自动隐藏 | OK（playWhenReady 判据） |
 | 控制条显示时页眉左上角出现「片名 (年份/国家) 时长:h:mm」小字 | OK |
@@ -424,7 +424,7 @@ minSdk 21 / targetSdk 34 / compileSdk 34。双 flavor 构建与产物（debug �
 | 包名 | com.tv.mailvod | com.mailvod.phone（可共存/并行调试） |
 | 版本 | 独立演进（build.gradle.kts productFlavors 内定义） | 独立演进 |
 | 入口 | LEANBACK_LAUNCHER + LAUNCHER | 仅 LAUNCHER |
-| 主题 | Theme.Leanback 系 | Theme.AppCompat.NoActionBar 系（同深色配色） |
+| 主题 | Theme.MailM3U8（parent=Theme.Leanback） | Theme.MailM3U8（parent=Theme.AppCompat.NoActionBar，同深色配色） |
 | 播放交互 | 遥控器 OK=播放/暂停直接切换(不弹控制条, dispatchKeyEvent 拦截), 左右 ±10s, 返回=二次确认退出 | ExoPlayer 默认触控条, 默认横屏(sensorLandscape), 返回直接退出 |
 | 列表交互 | D-pad 焦点高亮 + 表头表格 | 卡片行(片名大字 20sp 粗体 / 元信息 / 已下载标签) + 按钮行(在线播放/先下后播/删除, 最后一行右对齐) |
 | 标题栏 | 头像(48dp, 可聚焦黄框) + 标题 + 版本 + 刷新/设置(84dp 等宽) | 头像(36dp, 触点进关于页) + 标题 + 版本 + 刷新/设置(wrap_content) |
